@@ -280,7 +280,7 @@ OWNER_SECTION_MAP = [
         },
         "keywords": ["review", "reply", "rating"],
         "checkpoints": [
-            "사장님 전용 리뷰 목록 API는 별도 /owner 경로가 아니라 현재 GET /shops/{id}/reviews를 사용.",
+            "사장님 전용 리뷰 목록은 `GET /owner/reviews`를 사용합니다. 사장님 토큰만 있으면 자동으로 내 샵 리뷰만 조회됩니다. `GET /shops/{id}/reviews`는 일반 고객용이므로 사장님 웹에서는 쓸 필요 없습니다.",
             "대시보드의 unanswered_review_count는 shop_reply IS NULL 기준.",
         ],
     },
@@ -324,7 +324,7 @@ OWNER_SECTION_MAP = [
         },
         "keywords": ["snap", "comment", "shop-badge"],
         "checkpoints": [
-            "사장님 전용 스네일 목록 API는 현재 /owner 경로가 아니라 GET /shops/{id}/snaps를 사용.",
+            "사장님 전용 스네일 목록은 `GET /owner/snaps`를 사용합니다. 사장님 토큰만 있으면 자동으로 내 샵이 태그된 스네일만 조회됩니다. `GET /shops/{id}/snaps`는 일반 유저용이므로 사장님 웹에서는 쓸 필요 없습니다.",
             "샵 계정 댓글은 Comment.author_type/author_shop_id로 구분.",
         ],
     },
@@ -456,13 +456,15 @@ SCREEN_PLAYBOOKS = {
             "[미인증 처리]: 토큰이 아예 없거나 API 호출 결과로 `401 Unauthorized` 에러가 발생한다면, 당황하지 않고 자연스럽게 '로그인 화면'으로 이동시켜주세요.",
             "[회원가입 흐름]: 회원가입 폼을 다 채우고 [가입하기] 버튼을 누르면 `POST /owner/auth/register`를 호출합니다. 성공(200) 응답을 받으면 지체 없이 '사업자 인증 서류 제출 화면'으로 넘겨주시면 됩니다.",
             "[로그인 성공 후]: 토큰을 새로 받았다면 다시 `GET /owner/me`를 호출하여 `verification_status`를 보고, 승인되었으면 대시보드로, 대기 중이면 안내 화면으로 분기해주세요.",
-            "[사업자 서류 제출]: 사업자 등록증 사진과 번호를 입력해 제출(또는 재제출)할 때는 `POST /owner/business-verification` API를 호출하여 처리합니다."
+            "[사업자 서류 제출]: 사업자 등록증 사진과 번호를 입력해 제출(또는 재제출)할 때는 `POST /owner/business-verification` API를 호출하여 처리합니다.",
+            "[비밀번호 재설정 완료]: 이메일에서 재설정 링크를 클릭한 사장님이 새 비밀번호를 입력하고 [변경하기] 버튼을 누르면 `POST /owner/auth/password-reset/confirm`을 호출합니다. 토큰은 15분 유효, 1회만 사용 가능합니다."
         ],
         "ui_events": [
             ["[버튼] 회원가입", "POST /owner/auth/register", "가입 성공 토스트를 띄우고 사업자 인증 화면으로 즉시 이동시킵니다.", "백엔드에서 VALIDATION_ERROR가 오면 팝업 대신 입력칸 바로 아래에 빨간 텍스트로 에러 내용을 각각 표시해주세요."],
             ["[버튼] 로그인", "POST /owner/auth/login 호출 후 GET /owner/me 연속 호출", "현재 승인 상태(verification_status)를 확인하여 그에 맞는 첫 화면(대시보드 또는 대기 화면)으로 이동시킵니다.", "401 에러 시 '이메일이나 비밀번호를 다시 확인해주세요'라는 친절한 문구를 입력창 근처에 띄웁니다."],
             ["[버튼] 사업자 인증 제출", "POST /owner/business-verification", "화면을 '사업자 승인 대기 중(pending)' 안내 화면으로 부드럽게 전환시킵니다.", "파일 용량 초과나 사업자번호 형식이 틀렸다면 즉각 인라인 에러 텍스트로 고칠 곳을 알려줍니다."],
-            ["[버튼] 비밀번호 재설정", "POST /owner/auth/password-reset/request", "성공이든 미가입 이메일이든 보안을 위해 무조건 '재설정 이메일을 보냈습니다'라는 동일한 완료 모달을 띄웁니다.", "네트워크 단절 등 진짜 서버 오류(500)일 때만 공통 에러 모달을 띄워줍니다."]
+            ["[버튼] 비밀번호 재설정 요청", "POST /owner/auth/password-reset/request", "성공이든 미가입 이메일이든 보안을 위해 무조건 '재설정 이메일을 보냈습니다'라는 동일한 완료 모달을 띄웁니다.", "네트워크 단절 등 진짜 서버 오류(500)일 때만 공통 에러 모달을 띄워줍니다."],
+            ["[버튼] 새 비밀번호 저장", "POST /owner/auth/password-reset/confirm", "비밀번호 변경 성공 시 '비밀번호가 변경되었습니다' 토스트를 띄우고 로그인 화면으로 자동 이동시킵니다.", "토큰이 만료(15분)되었거나 이미 사용된 토큰이면 '링크가 만료되었습니다. 다시 요청해주세요' 안내와 함께 재설정 요청 화면으로 되돌립니다."]
         ],
         "states": [
             "`anonymous`: 로그인 안 된 유저. 로그인과 회원가입 폼만 노출합니다.",
@@ -482,6 +484,7 @@ SCREEN_PLAYBOOKS = {
             "[초안 폼 렌더링]: 아직 샵 데이터가 404로 없으면 빈 입력 폼을 띄워주고, 폼 작성 후 저장할 때 `POST /owner/shop`으로 생성합니다.",
             "[부분 수정 분리]: 샵 데이터가 이미 있다면, [기본 정보]는 `PATCH /owner/shop`, [영업시간]은 `PATCH /owner/shop/business-hours` 로 각각 나누어 저장 버튼과 API를 분리해주세요.",
             "[정책 및 결제]: 마찬가지로 [예약 정책] 탭은 `PATCH /owner/shop/reservation-policy`, [결제 방식] 탭은 `PATCH /owner/shop/payment-method`로 저장 로직을 분리해 관리합니다.",
+            "[이미지 관리]: 대표 이미지(thumbnail_url)와 샵 갤러리 이미지(image_urls, 최대 10장)를 수정할 때는 `PATCH /owner/shop/images`를 호출합니다. 이미지 파일 자체는 먼저 `POST /uploads/presigned`로 업로드 URL을 받아 직접 올린 후, 반환된 URL을 이 API에 넘깁니다.",
             "[공개 상태 토글]: 스위치를 눌러 공개/숨김을 바꿀 때는 `PATCH /owner/shop/visibility`를 호출합니다. 단, 아직 사업자 승인 전이라면 이 스위치를 회색으로 막아둬야 합니다."
         ],
         "ui_events": [
@@ -491,10 +494,10 @@ SCREEN_PLAYBOOKS = {
             ["[토글] 샵 공개 상태", "PATCH /owner/shop/visibility", "성공 시 헤더의 샵 뱃지를 active(초록색) / hidden(회색)으로 즉시 갈아끼워 줍니다.", "승인이 안 끝났는데(`VERIFICATION_REQUIRED`) 누르려 하면 스위치를 원복시키고 '인증 승인이 필요합니다' 모달을 띄워주세요."]
         ],
         "states": [
-            "`no_shop`: 아직 샵 데이터를 한 번도 안 만든 상태. 비어있는 초안 생성 폼을 띄워 유도를 시작합니다.",
-            "`draft_allowed`: 사업자 승인 대기 중(pending)이라도 텍스트 입력과 임시 저장은 가능한 유연한 상태입니다.",
-            "`active`: 고객 앱에 노출되고 검색과 예약 진입이 가능한 진짜 샵 운영 상태입니다.",
-            "`hidden`: 사장님이 원해서 임시로 숨긴 상태. 사장님 본인은 수정이 가능하지만 고객에겐 보이지 않습니다."
+            "`no_shop` (서버 응답 404): 아직 샵 데이터를 한 번도 안 만든 상태. GET /owner/shop 호출 시 404가 돌아오면 빈 초안 생성 폼을 띄워주세요.",
+            "`draft` (서버 값 visibility=draft): 사업자 승인 대기 중(pending)이라도 텍스트 입력과 임시 저장은 가능합니다. 단, 공개 전환 토글은 Disabled 처리해주세요.",
+            "`active` (서버 값 visibility=active): 고객 앱에 노출되고 검색과 예약 진입이 가능한 진짜 샵 운영 상태입니다.",
+            "`hidden` (서버 값 visibility=hidden): 사장님이 원해서 임시로 숨긴 상태. 사장님 본인은 수정이 가능하지만 고객에겐 보이지 않습니다."
         ],
         "qa": [
             "사업자 승인 전(pending) 계정으로 로그인한 상태에서 샵 정보를 이것저것 적고 저장을 누르면 성공해야 하고, 샵 공개 토글을 누르면 명확히 막히는지 직접 테스트해주세요.",
@@ -566,7 +569,9 @@ SCREEN_PLAYBOOKS = {
             ["[버튼] 예약 수락", "POST /owner/reservations/{id}/accept", "현장결제 샵이면 확정(confirmed) 녹색 뱃지로, 계좌이체 샵이면 입금대기(payment_pending) 주황색 뱃지로 변신시킵니다.", "그 사이 다른 고객이 낚아채서 CONFLICT가 나면 '앗, 이미 선점된 시간입니다' 모달을 띄워 상황을 알려줍니다."],
             ["[버튼] 입금 내역 확인 완료", "POST /owner/reservations/{id}/payment-confirmed", "입금 대기 딱지를 떼고 확정(confirmed) 뱃지로 바꾸며, 캘린더 해당 슬롯에 확정 디자인을 예쁘게 박아줍니다.", "혹시 그 사이 유저가 취소해서 409 에러가 나면 '취소된 예약입니다' 하고 화면을 새로고침시킵니다."],
             ["[버튼] 예약 거절", "POST /owner/reservations/{id}/reject", "목록에서 거절됨(rejected) 상태로 색상을 죽이거나, 필터 설정에 따라 아예 리스트에서 부드럽게 사라지게(애니메이션) 처리합니다.", "거절 사유 입력이 필수인데 사장님이 빈칸으로 냈다면, 텍스트 상자 주변을 붉게 흔들어주세요(Shake effect)."],
-            ["[버튼] 노쇼(No-show) 처리", "POST /owner/reservations/{id}/no-show", "해당 예약을 붉은색 노쇼 배지로 덮고 더 이상 변경할 수 없게 만듭니다.", "정책상 예약 시작 시간 30분 전까지는 노쇼 버튼이 프론트엔드에서 회색(Disabled)으로 굳게 잠겨 있어야 합니다."]
+            ["[버튼] 노쇼(No-show) 처리", "POST /owner/reservations/{id}/no-show", "해당 예약을 붉은색 노쇼 배지로 덮고 더 이상 변경할 수 없게 만듭니다.", "정책상 예약 시작 시간 30분 전까지는 노쇼 버튼이 프론트엔드에서 회색(Disabled)으로 굳게 잠겨 있어야 합니다."],
+            ["[버튼] 시술 완료 처리", "POST /owner/reservations/{id}/complete", "확정(confirmed) 예약의 시술이 끝나면 이 버튼을 눌러 상태를 completed로 변경합니다. 완료 후에는 유저가 리뷰를 작성할 수 있게 됩니다.", "이미 completed/cancelled/no_show 상태인 예약에서 이 버튼을 누르면 409 에러가 뜹니다. 프론트에서 confirmed 상태일 때만 버튼을 노출해주세요."],
+            ["[버튼] 샵 사정 예약 취소", "POST /owner/reservations/{id}/cancel", "사장님 측 사정으로 예약을 취소합니다. 취소 사유(reason)는 필수 텍스트 입력이며, 유저에게 알림과 함께 사유가 전달됩니다.", "취소 사유 입력칸이 비어있으면 버튼을 비활성화하거나 '취소 사유를 입력해주세요' 인라인 에러를 표시해주세요. 이미 종료된 예약(completed/no_show)에서는 409 에러가 반환됩니다."]
         ],
         "states": [
             "`pending`: 사장님의 수락/거절을 목빠지게 기다리는 신규 요청. 미처리 요청은 무조건 `created_at` 오름차순(먼저 온 사람 먼저)으로 보여주세요.",
