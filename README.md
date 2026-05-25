@@ -25,6 +25,20 @@ python tools\build_workbook.py
 기존 엑셀 파일이 열려 있어 덮어쓸 수 없으면 `_updated` 또는 타임스탬프가 붙은 새 파일명으로 저장합니다.
 
 ```powershell
+python tools\build_owner_webapp_index.py
+```
+
+위 명령은 `references/snail_owner_webapp_spec_v1.md`와 `spec_text/*.md`를 연결해 `outputs/owner_webapp_backend_index.html` 비주얼라이저와 `outputs/owner_webapp_backend_index.json` 색인 데이터를 생성합니다.
+사장님 웹앱 프론트 작업자는 HTML 파일을 열어 기능별 관련 백엔드 필드/API를 빠르게 찾을 수 있습니다.
+
+```powershell
+python tools\build_all_collaboration_outputs.py
+```
+
+위 명령은 엑셀과 현재 등록된 협업 비주얼라이저를 한 번에 재생성합니다.
+앞으로 LLM 작업자나 다른 프론트엔드용 HTML을 추가할 때는 역할별 빌더를 만든 뒤 `build_all_collaboration_outputs.py`의 `STEPS`에 추가하면 됩니다.
+
+```powershell
 python tools\export_spec_text.py
 ```
 

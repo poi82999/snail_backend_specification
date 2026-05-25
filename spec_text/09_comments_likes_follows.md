@@ -84,7 +84,7 @@
       ],
       [
         "POST /snaps/{id}/comments",
-        "댓글 작성",
+        "댓글 작성. 사장님 웹에서 호출하면 본인 단수 샵 계정(author_type=shop, author_shop_id=내 shop_id)으로 작성",
         "content"
       ],
       [
@@ -115,6 +115,11 @@
       [
         "POST /comments/{id}/like",
         "댓글 좋아요",
+        "-"
+      ],
+      [
+        "DELETE /comments/{id}/like",
+        "댓글 좋아요 취소",
         "-"
       ],
       [

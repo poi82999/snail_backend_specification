@@ -154,7 +154,7 @@
 - 향후 결제 기능 범위: 예약금/PG/환불 기능을 어느 버전에서 도입할지 결정. MVP 앱에서는 결제 기능을 구현하지 않는다.
 - 예약 운영 안내 문구: 결제 없는 예약 요청 구조에서 유저에게 취소/노쇼/변경 안내를 어떻게 보여줄지 결정.
 - 결제 없는 예약 보완 기준: 활성 예약 수 제한, 노쇼 이력 기록, 취소 이력 기록, 리마인드 알림, 수동수락 기본 운영 범위를 결정.
-- 예약 자동수락 기본값: 샵 생성 시 `auto_accept` 기본값을 true/false 중 무엇으로 둘지 결정.
+- 예약 자동수락 기본값: 샵 생성 시 `auto_accept=false`(수동수락)를 기본값으로 둔다.
 - 예약 슬롯 단위: 15분 단위와 30분 단위 중 MVP 기본값 결정.
 - 예약 버퍼 시간: 시술 전후 준비/정리 시간을 둘지, 둔다면 샵/디자인/디자이너 중 어디에 설정할지 결정.
 - 당일 예약 마감: 몇 시간 전까지 예약 가능한지 기본 정책 결정.
@@ -243,7 +243,7 @@ MVP 검색 구현 기본안:
 - 디자이너 지정 예약과 자동 배정 예약을 모두 지원한다.
 - 자동 배정은 선택 시간에 가능한 디자이너 중 랜덤이다.
 - MVP 앱에서는 예약금 결제 기능을 구현하지 않는다.
-- 예약은 결제 없이 “예약 요청”으로 생성되고, 사장님 수락 또는 샵 자동수락에 따라 확정된다.
+- 예약은 결제 없이 “예약 요청”으로 생성된다. 현장결제 샵은 사장님 수락 또는 샵 자동수락에 따라 확정되고, 계좌이체 샵은 사장님 수락 후 `payment_pending`을 거쳐 사장님 입금 확인 시 확정된다.
 - 취소/거절/노쇼는 앱 내 금전 처리 없이 예약 상태로만 관리한다.
 - 결제 없는 예약의 노쇼 리스크는 활성 예약 수 제한, 노쇼/취소 이력 기록, 예약 전 리마인드, 사장님 수동수락으로 보완한다.
 - 예약 생성에는 `Idempotency-Key`가 필수다.
@@ -290,6 +290,7 @@ MVP 검색 구현 기본안:
 ### 예약 상태
 
 - `pending`: 사장님 수락 대기.
+- `payment_pending`: 계좌이체 예약금 입금 확인 대기.
 - `confirmed`: 확정.
 - `rejected`: 사장님 거절.
 - `cancelled_by_user`: 유저 취소.
@@ -305,7 +306,9 @@ MVP 검색 구현 기본안:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 생성 전 | 유저 | 예약 요청 생성 | `POST /reservations` | `pending` 또는 `confirmed` | 결제 없이 예약 요청 생성. 샵 자동수락이면 즉시 확정 | 승인 대기/예약 완료 | 신규 예약 노출 | 예약 요청 중 로딩, 실패 화면 |
 | `pending` | 유저 | 예약 요청 취소 | `DELETE /reservations/{id}` | `cancelled_by_user` | 예약 요청 취소 | 취소됨 | 취소 예약 표시 | 취소 전 확인 모달 |
-| `pending` | 사장님 | 예약 수락 | `POST /owner/reservations/{id}/accept` | `confirmed` | 금전 처리 없음 | 예약 완료 | 확정 예약 표시 | 수락 후 버튼 상태 |
+| `pending` | 사장님 | 예약 수락 | `POST /owner/reservations/{id}/accept` | `confirmed` 또는 `payment_pending` | 현장결제는 즉시 확정, 계좌이체는 입금 확인 대기 | 예약 완료/입금 확인 대기 | 확정 예약 또는 입금 확인 대기 | 결제 방식별 버튼 상태 |
+| `payment_pending` | 유저 | 입금 완료 알림 | `POST /reservations/{id}/payment-notified` | `payment_pending` | 사장님에게 입금 확인 요청 알림 | 사장님 확인 중 | 입금 확인 요청 뱃지 | 재클릭 차단 |
+| `payment_pending` | 사장님 | 입금 확인 | `POST /owner/reservations/{id}/payment-confirmed` | `confirmed` | 사장님 수동 통장 확인 후 확정 | 예약 완료 | 확정 예약 표시 | 확인 전/후 버튼 상태 |
 | `pending` | 사장님 | 예약 거절 | `POST /owner/reservations/{id}/reject` | `rejected` | 사장님이 예약 요청 거절 | 거절됨 | 거절 예약 표시 | 거절 사유 입력 여부 |
 | `confirmed` | 유저 | 예약 취소 | `DELETE /reservations/{id}` | `cancelled_by_user` | 확정 예약 취소 | 취소됨 | 취소 예약 표시 | 취소 전 안내 문구 |
 | `confirmed` | 사장님 | 샵 사정 취소 | `POST /owner/reservations/{id}/cancel` | `cancelled_by_shop` | 사장님이 확정 예약 취소 | 샵 사정으로 취소됨 | 취소 처리 완료 | 사유 필수 여부 |
@@ -324,7 +327,7 @@ MVP 검색 구현 기본안:
 - 슬롯 길이: 디자인의 `duration_minutes`를 기준으로 종료 시간을 계산한다.
 - 영업시간 밖 슬롯은 노출하지 않는다.
 - 샵 휴무일과 디자이너 휴무/비활성 상태는 제외한다.
-- 이미 `pending` 또는 `confirmed` 예약이 겹치는 디자이너는 제외한다.
+- 이미 `payment_pending` 또는 `confirmed` 예약이 겹치는 디자이너는 제외한다. 단순 `pending`은 슬롯을 hard-lock하지 않으며, 같은 슬롯의 미처리 요청은 사장님 웹에서 생성 순서대로 보여준다.
 - `rejected`, `cancelled_by_user`, `cancelled_by_shop` 예약은 슬롯 점유에서 제외한다.
 - `no_show`, `completed`는 과거 예약이므로 미래 슬롯 점유에는 영향이 없다.
 - 유저가 디자이너를 선택하지 않으면 해당 시간에 가능한 디자이너 중 랜덤 배정한다.
@@ -361,8 +364,8 @@ MVP 검색 구현 기본안:
 ### 샵/디자이너
 
 - 사장님 계정은 이메일, 비밀번호, 대표자명, 카카오 알림톡 수신용 전화번호, 사업자등록번호, 사업자등록증을 가진다.
-- 샵은 이름, 주소, 좌표, 전화, 소개, 대표 이미지, 영업시간, 자동수락 여부, 예약 운영 안내, 평균 별점, 리뷰 수, 찜 수를 가진다.
-- 디자이너는 샵에 종속되며 이름, 경력, 직급, 프로필 사진, 전문 태그, 활성 여부를 가진다.
+- MVP는 1사장님=1샵 단수 구조다. 샵은 이름, 주소, 좌표, 전화, 소개, 대표 이미지, 영업시간, 자동수락 여부, 예약 운영 안내, 공개 상태, 평균 별점, 리뷰 수, 찜 수를 가진다.
+- 디자이너는 샵에 종속되며 이름, 경력, 직급, 프로필 사진, 활성 여부를 가진다. 전문 태그는 백엔드 선택 필드로만 유지하고 MVP 프론트 입력 UI에서는 제외 가능하다.
 - 디자이너 스케줄은 요일, 시작/종료, 휴게, 휴무 여부로 관리한다.
 
 ### 사장님 웹 CRUD API 기본안
@@ -381,19 +384,20 @@ MVP 검색 구현 기본안:
 
 #### Shop
 
-- `POST /owner/shops`: 샵 생성.
-- `GET /owner/shops`: 내가 관리하는 샵 목록.
-- `GET /owner/shops/{shop_id}`: 샵 상세.
-- `PATCH /owner/shops/{shop_id}`: 샵 기본 정보 수정.
-- `PATCH /owner/shops/{shop_id}/business-hours`: 영업시간 수정.
-- `PATCH /owner/shops/{shop_id}/reservation-policy`: 자동수락, 예약 운영 안내 수정.
-- `PATCH /owner/shops/{shop_id}/images`: 대표 이미지/샵 이미지 수정.
+- `POST /owner/shop`: 내 단수 샵 초안 생성.
+- `GET /owner/shop`: 내 단수 샵 조회.
+- `PATCH /owner/shop`: 샵 기본 정보 수정.
+- `PATCH /owner/shop/business-hours`: 영업시간 수정.
+- `PATCH /owner/shop/reservation-policy`: 자동수락, 예약 운영 안내 수정.
+- `PATCH /owner/shop/payment-method`: 결제 방식/예약금/계좌 정보 수정.
+- `PATCH /owner/shop/images`: 대표 이미지/샵 이미지 수정.
+- `PATCH /owner/shop/visibility`: 샵 공개/숨김 전환.
 - 협업자 확인 사항: 여러 샵 관리 여부, 예약 운영 안내 입력 UI, 영업시간 휴무 UI.
 
 #### Designer
 
-- `POST /owner/shops/{shop_id}/designers`: 디자이너 추가.
-- `GET /owner/shops/{shop_id}/designers`: 디자이너 목록.
+- `POST /owner/designers`: 디자이너 추가.
+- `GET /owner/designers`: 디자이너 목록.
 - `GET /owner/designers/{designer_id}`: 디자이너 상세.
 - `PATCH /owner/designers/{designer_id}`: 디자이너 정보 수정.
 - `PATCH /owner/designers/{designer_id}/schedule`: 주간 근무시간 수정.
@@ -403,8 +407,8 @@ MVP 검색 구현 기본안:
 
 #### Design
 
-- `POST /owner/shops/{shop_id}/designs`: 디자인 등록.
-- `GET /owner/shops/{shop_id}/designs`: 디자인 목록.
+- `POST /owner/designs`: 디자인 등록.
+- `GET /owner/designs`: 디자인 목록.
 - `GET /owner/designs/{design_id}`: 디자인 상세/LLM 분석 상태 조회.
 - `PATCH /owner/designs/{design_id}`: 디자인 정보 수정.
 - `POST /owner/designs/{design_id}/images`: 디자인 이미지 추가.
@@ -421,7 +425,7 @@ MVP 검색 구현 기본안:
 - 사장님 태그와 AI 태그는 검색에 함께 사용한다.
 - 상태 값: `draft`, `transforming`, `classifying`, `active`, `failed`, `hidden`.
 - 이미지 원본은 저장하고, LLM 1단계 결과인 규격화 이미지 URL을 노출용으로 사용한다.
-- 이미지 업로드 제안: jpg/jpeg/png/heic, 장당 10MB, 긴 변 1080px 이상 권장, 디자인당 1~10장.
+- 이미지 업로드 제안: jpg/jpeg/png/heic, 장당 10MB, 긴 변 1080px 이상 권장, 디자인당 1~5장.
 
 ### 커뮤니티 스네일
 
@@ -687,6 +691,7 @@ MVP 검색 구현 기본안:
 - `GET /users/{id}/snaps`: 유저 스네일.
 - `GET /designs/{id}/snaps`: 특정 디자인을 받은 스네일.
 - `GET /shops/{id}/snaps`: 특정 샵 태그 스네일.
+- `GET /owner/snaps`: 내 단수 샵 태그 스네일 목록.
 - `PATCH /snaps/{id}`: 스네일 수정.
 - `DELETE /snaps/{id}`: 스네일 삭제.
 
@@ -712,6 +717,7 @@ MVP 검색 구현 기본안:
 - `PATCH /reviews/{id}`: 리뷰 수정.
 - `DELETE /reviews/{id}`: 리뷰 삭제.
 - `GET /shops/{id}/reviews`: 샵 리뷰 목록.
+- `GET /owner/reviews`: 내 단수 샵 리뷰 목록.
 - `GET /designs/{id}/reviews`: 디자인 리뷰 목록.
 - `GET /users/me/reviews`: 내 리뷰.
 - `POST /reviews/{id}/reply`: 샵 답변 작성.

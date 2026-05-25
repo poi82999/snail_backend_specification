@@ -1,4 +1,7 @@
 __pycache__/
 *.pyc
 outputs/*.xlsx
+outputs/*.html
+outputs/*.json
+outputs/*.png
 ~$*.xlsx

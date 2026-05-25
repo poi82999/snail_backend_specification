@@ -122,8 +122,13 @@
         "-"
       ],
       [
+        "GET /owner/reviews",
+        "내 단수 샵 리뷰 목록. 사장님 웹 전용. sort 허용값: latest(기본) / rating_desc / rating_asc, unanswered=true이면 shop_reply IS NULL만 조회",
+        "sort, unanswered, cursor"
+      ],
+      [
         "GET /shops/{id}/reviews",
-        "샵 리뷰 목록",
+        "샵 리뷰 목록. sort 허용값: latest(기본) / rating_desc / rating_asc",
         "sort, cursor"
       ],
       [
@@ -138,8 +143,18 @@
       ],
       [
         "POST /reviews/{id}/reply",
-        "샵 답변 작성",
+        "샵 답변 작성 (리뷰당 1개). 사장님만",
         "content"
+      ],
+      [
+        "PATCH /reviews/{id}/reply",
+        "샵 답변 수정. 사장님만",
+        "content"
+      ],
+      [
+        "DELETE /reviews/{id}/reply",
+        "샵 답변 삭제. shop_reply와 shop_reply_at을 null로 클리어. 사장님만",
+        "-"
       ]
     ]
   },

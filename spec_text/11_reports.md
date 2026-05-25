@@ -63,6 +63,25 @@
       ]
     ]
   },
+  "apis": {
+    "reports": [
+      [
+        "POST /reports",
+        "유저 또는 사장님이 신고 제출",
+        "target_type, target_id, reason_code, reason_detail"
+      ],
+      [
+        "GET /admin/reports",
+        "신고 내역 목록 (어드민)",
+        "status, cursor"
+      ],
+      [
+        "PATCH /admin/reports/{id}",
+        "신고 처리 (어드민)",
+        "status, resolved_action"
+      ]
+    ]
+  },
   "page_guides": {
     "11.커뮤니티_신고": {
       "covers": "스네일/댓글/리뷰/유저/샵 신고와 운영 처리",

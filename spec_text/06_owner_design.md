@@ -59,13 +59,13 @@
         "owner_tags",
         "string[]",
         "선택",
-        "사장님 태그"
+        "사장님이 직접 입력하는 해시태그. 0~N개 자유 입력. 노출 조건에서 제외(0개여도 등록/노출 가능). 검색에서는 ai_tags와 함께 사용되며 더 높은 가중치를 받음 (사장님 의도 신호로 해석)"
       ],
       [
         "ai_tags",
         "string[]",
         "자동",
-        "LLM 2단계 결과"
+        "LLM 2단계 결과. owner_tags와 별도 필드로 보관. 검색에서는 두 태그를 모두 사용하되 가중치/표시 분리 가능"
       ],
       [
         "ai_color_palette",
@@ -80,10 +80,28 @@
         "simple/glamour/..."
       ],
       [
-        "status",
+        "visibility",
         "enum",
         "자동",
-        "draft/transforming/classifying/active/failed/hidden"
+        "draft / active / hidden. 사장님 통제 영역. 기본 active. PATCH /owner/designs/{id}/visibility로 변경"
+      ],
+      [
+        "ai_analysis_status",
+        "enum",
+        "자동",
+        "pending / in_progress / done / failed. 시스템 통제 영역. 사장님 등록 직후 pending → 백그라운드 큐가 처리 → done/failed. failed 시 재분석 가능"
+      ],
+      [
+        "ai_analysis_started_at",
+        "timestamp",
+        "자동",
+        "LLM 큐 처리 시작 시각. UI에서 '분석 중 (X분 경과)' 표시용"
+      ],
+      [
+        "ai_analysis_completed_at",
+        "timestamp",
+        "자동",
+        "AI 분석 완료(done) 시각. failed 시에는 마지막 시도 시각"
       ],
       [
         "favorite_count",
@@ -152,14 +170,14 @@
   "apis": {
     "owner_design": [
       [
-        "POST /owner/shops/{shop_id}/designs",
-        "디자인 등록",
-        "title, price, duration, designers, images"
+        "POST /owner/designs",
+        "내 단수 샵 디자인 등록 (사장님 응답 즉시 200, AI 분석은 백그라운드 큐). 이미지 최대 5장. owner_tags는 선택(0~N개). 등록 직후 visibility=active, ai_analysis_status=pending. 노출은 ai_analysis_status=done + shop.visibility=active + owner.verification_status=approved 이후",
+        "title, base_price, duration_minutes, available_designer_ids, images(max 5), owner_tags?"
       ],
       [
-        "GET /owner/shops/{shop_id}/designs",
-        "디자인 목록",
-        "status, cursor"
+        "GET /owner/designs",
+        "내 단수 샵 디자인 목록. 필터로 visibility, ai_analysis_status 둘 다 사용 가능. 사장님 화면에서 '분석 중', '분석 실패', '숨김' 탭 구분",
+        "visibility, ai_analysis_status, cursor"
       ],
       [
         "GET /owner/designs/{design_id}",
@@ -169,27 +187,27 @@
       [
         "PATCH /owner/designs/{design_id}",
         "디자인 정보 수정",
-        "title, description, price, duration, designers, tags"
+        "title, description, base_price, duration_minutes, available_designer_ids, owner_tags"
       ],
       [
         "POST /owner/designs/{design_id}/images",
-        "디자인 이미지 추가",
-        "image_urls"
+        "디자인 이미지 추가. 디자인당 이미지 최대 5장 제한을 초과하면 VALIDATION_ERROR. 호출 시 백엔드가 design.ai_analysis_status를 pending으로 자동 되돌리고 LLM 큐에 재투입 (이미지 변경 자동 재분석 트리거)",
+        "image_urls(max total 5)"
       ],
       [
         "DELETE /owner/designs/{design_id}/images/{image_id}",
-        "디자인 이미지 삭제",
+        "디자인 이미지 삭제. 삭제 후 최소 1장 이상 남아야 함. 호출 시 design.ai_analysis_status를 pending으로 자동 되돌리고 LLM 큐에 재투입 (이미지 변경 자동 재분석 트리거)",
         "-"
       ],
       [
         "POST /owner/designs/{design_id}/reanalyze",
-        "LLM 재분석 요청",
+        "LLM 재분석 요청. ai_analysis_status=failed이거나 사장님이 수동으로 다시 돌리고 싶을 때. pending으로 되돌리고 큐에 재투입",
         "-"
       ],
       [
         "PATCH /owner/designs/{design_id}/visibility",
         "노출/숨김 변경",
-        "visible"
+        "visibility"
       ],
       [
         "DELETE /owner/designs/{design_id}",
@@ -200,9 +218,9 @@
   },
   "page_guides": {
     "6.사장님(웹)_디자인": {
-      "covers": "디자인 등록, 가격, 소요시간, 가능 디자이너, 이미지, LLM 분석 상태",
-      "related_work": "사장님 웹 디자인 등록/수정/숨김/삭제, 이미지 업로드, LLM 재분석",
-      "how_to_use": "분석 중/실패/완료 상태를 어떻게 보여줄지, 디자인 삭제와 숨김을 어떻게 구분할지 확인한다"
+      "covers": "디자인 등록, 가격, 소요시간, 가능 디자이너, 이미지(최대 5장), 사장님 태그(선택), AI 분석 상태, 노출 조건, 이미지 변경 자동 재분석",
+      "related_work": "사장님 웹 디자인 등록/수정/숨김/삭제, 이미지 업로드, LLM 재분석, 분석 상태 표시",
+      "how_to_use": "사장님 태그 입력 UI(0~N개 자유 입력, 검색 가중치 안내 가능), 디자인 이미지 1~5장 제한, 분석 중/실패/완료 상태 표시(MVP 사장님 화면은 pending+in_progress를 '분석 중' 한 덩어리로 표시), '아직 사용자에게 노출되지 않음' 안내, 디자인 삭제와 숨김 구분, 분석 실패 시 [재분석] 버튼 노출(POST /owner/designs/{id}/reanalyze)을 확인한다. 사용자 노출은 ai_analysis_status=done + visibility=active + shop.visibility=active + owner.verification_status=approved 조합으로 판정"
     }
   }
 }

@@ -148,6 +148,11 @@
         "cursor"
       ],
       [
+        "GET /owner/snaps",
+        "내 단수 샵이 태그된 스네일 목록. 사장님 웹 전용",
+        "cursor"
+      ],
+      [
         "GET /shops/{id}/snaps",
         "특정 샵 태그 스네일",
         "cursor"

@@ -75,6 +75,47 @@
       ]
     ]
   },
+  "apis": {
+    "user_auth": [
+      [
+        "POST /auth/apple",
+        "Apple 로그인 연동",
+        "apple_identity_token"
+      ],
+      [
+        "POST /auth/login",
+        "일반 로그인 (토큰 발급)",
+        "email, password"
+      ],
+      [
+        "POST /auth/refresh",
+        "토큰 갱신",
+        "refresh_token"
+      ],
+      [
+        "POST /auth/logout",
+        "로그아웃",
+        "-"
+      ]
+    ],
+    "user_profile": [
+      [
+        "GET /users/me",
+        "내 프로필 조회",
+        "-"
+      ],
+      [
+        "PATCH /users/me",
+        "내 프로필 수정",
+        "nickname, profile_image_url, bio, preferred_tags"
+      ],
+      [
+        "DELETE /users/me",
+        "회원 탈퇴",
+        "-"
+      ]
+    ]
+  },
   "page_guides": {
     "3.유저(앱)_회원": {
       "covers": "Apple Sign In, 유저 프로필, 닉네임, 프로필 사진, 관심 태그, APNs 토큰",
