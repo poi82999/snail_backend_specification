@@ -32,6 +32,13 @@ python tools\build_owner_webapp_index.py
 사장님 웹앱 프론트 작업자는 HTML 파일을 열어 기능별 관련 백엔드 필드/API를 빠르게 찾을 수 있습니다.
 
 ```powershell
+python tools\build_llm_pipeline_index.py
+```
+
+위 명령은 `references/snail_llm_pipeline_integration_guide.md`와 `spec_text/*.md`를 연결해 `outputs/llm_pipeline_backend_index.html` 비주얼라이저와 `outputs/llm_pipeline_backend_index.json` 색인 데이터를 생성합니다.
+LLM 작업자는 Transform/Classify 계약, 에러 코드, 표준 태그 사전, 백엔드 저장 필드/API를 한 화면에서 확인할 수 있습니다.
+
+```powershell
 python tools\build_all_collaboration_outputs.py
 ```
 
@@ -40,12 +47,14 @@ python tools\build_all_collaboration_outputs.py
 
 ## Notion 공유용 링크
 
-`tools\build_owner_webapp_index.py`는 로컬 확인용 `outputs/owner_webapp_backend_index.html`과 함께 GitHub Pages 공유용 `docs/owner_webapp_backend_index.html`도 생성합니다.
+각 HTML 빌더는 로컬 확인용 `outputs/*.html`과 함께 GitHub Pages 공유용 `docs/*.html`도 생성합니다.
 
 GitHub 저장소 Settings → Pages에서 source를 `Deploy from a branch`, branch를 `main`, folder를 `/docs`로 설정하면 아래 URL을 Notion에 붙여 공유할 수 있습니다.
 
 ```text
+https://poi82999.github.io/snail_backend_specification/
 https://poi82999.github.io/snail_backend_specification/owner_webapp_backend_index.html
+https://poi82999.github.io/snail_backend_specification/llm_pipeline_backend_index.html
 ```
 
 ```powershell

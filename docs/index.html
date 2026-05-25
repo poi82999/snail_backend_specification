@@ -3,10 +3,86 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="refresh" content="0; url=owner_webapp_backend_index.html">
   <title>Snail Backend Collaboration Index</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --line: #d7dde6;
+      --text: #17202a;
+      --muted: #667485;
+      --accent: #0f766e;
+      --accent-weak: #e7f4f1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, "Malgun Gothic", sans-serif;
+      font-size: 14px;
+    }
+    main {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    a.card {
+      display: block;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 16px;
+      text-decoration: none;
+    }
+    a.card:hover {
+      border-color: var(--accent);
+      background: var(--accent-weak);
+    }
+    .title {
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .desc {
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 13px;
+    }
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
-  <p><a href="owner_webapp_backend_index.html">사장님 웹앱 백엔드 바인딩 인덱스 열기</a></p>
+  <main>
+    <h1>Snail Backend Collaboration Index</h1>
+    <p>프론트엔드, LLM 작업자, 백엔드 협업자가 같은 백엔드 명세를 빠르게 찾아볼 수 있도록 만든 정적 HTML 인덱스입니다.</p>
+    <div class="grid">
+      <a class="card" href="owner_webapp_backend_index.html">
+        <div class="title">사장님 웹앱 ↔ 백엔드</div>
+        <div class="desc">사장님 웹앱 기능명세 기준으로 관련 백엔드 필드, API, 구현 체크포인트를 찾습니다.</div>
+      </a>
+      <a class="card" href="llm_pipeline_backend_index.html">
+        <div class="title">LLM 파이프라인 ↔ 백엔드</div>
+        <div class="desc">Transform/Classify 계약, 에러 코드, 표준 태그 사전, 저장 필드를 연결해 확인합니다.</div>
+      </a>
+    </div>
+  </main>
 </body>
 </html>
