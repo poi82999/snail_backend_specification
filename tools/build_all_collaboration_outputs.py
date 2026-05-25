@@ -37,6 +37,7 @@ def main():
     print("\nDone.")
     print("outputs/네일예약_백엔드_협업명세서_v3.xlsx")
     print("outputs/owner_webapp_backend_index.html")
+    print("docs/owner_webapp_backend_index.html")
     print("\n새 역할용 HTML 자동화 절차:")
     print("1. references/ 아래에 역할별 기능명세서 md를 둡니다.")
     print("2. tools/build_owner_webapp_index.py를 복사해 역할별 SECTION_MAP과 출력 파일명만 바꿉니다.")

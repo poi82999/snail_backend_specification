@@ -38,6 +38,16 @@ python tools\build_all_collaboration_outputs.py
 위 명령은 엑셀과 현재 등록된 협업 비주얼라이저를 한 번에 재생성합니다.
 앞으로 LLM 작업자나 다른 프론트엔드용 HTML을 추가할 때는 역할별 빌더를 만든 뒤 `build_all_collaboration_outputs.py`의 `STEPS`에 추가하면 됩니다.
 
+## Notion 공유용 링크
+
+`tools\build_owner_webapp_index.py`는 로컬 확인용 `outputs/owner_webapp_backend_index.html`과 함께 GitHub Pages 공유용 `docs/owner_webapp_backend_index.html`도 생성합니다.
+
+GitHub 저장소 Settings → Pages에서 source를 `Deploy from a branch`, branch를 `main`, folder를 `/docs`로 설정하면 아래 URL을 Notion에 붙여 공유할 수 있습니다.
+
+```text
+https://poi82999.github.io/snail_backend_specification/owner_webapp_backend_index.html
+```
+
 ```powershell
 python tools\export_spec_text.py
 ```

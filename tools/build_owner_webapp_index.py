@@ -5,11 +5,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+GITHUB_BLOB_BASE = "https://github.com/poi82999/snail_backend_specification/blob/main"
 SPEC_TEXT_DIR = ROOT / "spec_text"
 FRONT_SPEC_PATH = ROOT / "references" / "snail_owner_webapp_spec_v1.md"
 OUTPUT_DIR = ROOT / "outputs"
+DOCS_DIR = ROOT / "docs"
 INDEX_JSON_PATH = OUTPUT_DIR / "owner_webapp_backend_index.json"
 INDEX_HTML_PATH = OUTPUT_DIR / "owner_webapp_backend_index.html"
+SHARED_HTML_PATH = DOCS_DIR / "owner_webapp_backend_index.html"
 
 
 OWNER_SECTION_MAP = [
@@ -91,7 +94,7 @@ OWNER_SECTION_MAP = [
         },
         "keywords": ["shop", "business-hours", "payment-method", "deposit"],
         "checkpoints": [
-            "프론트 명세는 1사장님=1샵 구조지만 API는 shop_id 기반 다중 샵 형태가 남아 있음.",
+            "MVP는 1사장님=1샵 단수 구조이며 사장님 웹 API는 /owner/shop 기준으로 사용.",
             "auto_accept=true이면 bank_transfer_guide 조합은 백엔드도 VALIDATION_ERROR로 거부.",
         ],
     },
@@ -560,9 +563,8 @@ def load_backend_data():
 def link_for_source(source_file, line=None):
     if not source_file:
         return ""
-    prefix = "../" if source_file.startswith("spec_text/") else ""
     suffix = f"#L{line}" if line else ""
-    return f"{prefix}{source_file}{suffix}"
+    return f"{GITHUB_BLOB_BASE}/{source_file}{suffix}"
 
 
 def resolve_mapping(mapping, backend, front_sections):
@@ -1095,9 +1097,12 @@ HTML_TEMPLATE = """<!doctype html>
 
 def write_outputs(index):
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
     INDEX_JSON_PATH.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
     json_for_html = json.dumps(index, ensure_ascii=False).replace("</", "<\\/")
-    INDEX_HTML_PATH.write_text(HTML_TEMPLATE.replace("__INDEX_DATA__", json_for_html), encoding="utf-8")
+    html = HTML_TEMPLATE.replace("__INDEX_DATA__", json_for_html)
+    INDEX_HTML_PATH.write_text(html, encoding="utf-8")
+    SHARED_HTML_PATH.write_text(html, encoding="utf-8")
 
 
 def main():
@@ -1105,6 +1110,7 @@ def main():
     write_outputs(index)
     print(f"saved: {INDEX_JSON_PATH}")
     print(f"saved: {INDEX_HTML_PATH}")
+    print(f"saved: {SHARED_HTML_PATH}")
     print(f"sections: {index['stats']['mapping_sections']}")
     print(f"fields: {index['stats']['backend_fields']}")
     print(f"apis: {index['stats']['apis']}")
