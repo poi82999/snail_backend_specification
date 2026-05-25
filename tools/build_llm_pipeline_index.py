@@ -111,6 +111,127 @@ STEP_PLAIN_LANGUAGE = {
 }
 
 
+LLM_STEP_PLAYBOOKS = {
+    "flow": {
+        "call_order": [
+            "사장님이 디자인을 등록하면 백엔드는 원본 이미지를 저장하고 `ai_analysis_status=pending`으로 둔다.",
+            "백엔드 워커가 이미지별로 Transform 요청을 만든다.",
+            "Transform 성공 callback이 오면 `DesignImage.cropped_url`과 `ai_transform_status=done`을 저장한다.",
+            "Transform 성공 이미지에 대해 Classify 요청을 만든다.",
+            "Classify 성공 결과를 디자인 단위 태그/색상/스타일로 병합하고 `ai_analysis_status=done`으로 변경한다.",
+            "하나라도 최종 실패하면 실패 사유를 저장하고 사장님 화면에서 재분석/사진 교체 동선을 보여준다.",
+        ],
+        "events": [
+            ["디자인 등록됨", "Transform 큐 작업 생성", "원본 이미지별 작업 시작", "이미지 없음/URL 오류면 failed"],
+            ["Transform 완료", "Classify 큐 작업 생성", "cropped_url 저장 후 다음 단계 진행", "NO_NAIL 등 실패 코드는 Classify 생략"],
+            ["Classify 완료", "Design.ai_* 필드 업데이트", "검색 노출 조건 충족 가능", "태그 사전 외 값은 검증 실패"],
+        ],
+        "qa": [
+            "디자인 등록 API 응답이 LLM 완료를 기다리지 않는지 확인",
+            "Transform 실패 시 Classify 요청이 생성되지 않는지 확인",
+            "Classify 완료 후 고객 검색 대상 조건이 `ai_analysis_status=done`으로 바뀌는지 확인",
+            "같은 callback이 2번 와도 DB 상태가 중복/오염되지 않는지 확인",
+        ],
+    },
+    "transform": {
+        "call_order": [
+            "백엔드가 `image_id`, `image_url`, `callback_url`, `options`를 담아 `/v1/transform`을 호출한다.",
+            "LLM은 `image_url`에서 원본을 다운로드한다.",
+            "손톱 영역을 감지하고 지정 크기로 crop/normalize한다.",
+            "cropped 이미지를 저장하고 `cropped_image_url`을 만든다.",
+            "성공/실패 결과를 동기 응답 또는 callback으로 백엔드에 돌려준다.",
+        ],
+        "events": [
+            ["요청 수신", "image_url 다운로드", "처리 시작", "다운로드 실패면 INTERNAL_ERROR 또는 명확한 오류 반환"],
+            ["손톱 감지 성공", "cropped 이미지 생성", "success 응답", "confidence가 낮으면 실패 기준 적용"],
+            ["손톱 감지 실패", "failed 응답", "NO_NAIL/LOW_QUALITY 등 코드 반환", "error_code 누락 금지"],
+        ],
+        "qa": [
+            "요청의 image_id가 응답에 그대로 돌아오는지 확인",
+            "NO_NAIL 사진 샘플에서 `status=failed`, `error_code=NO_NAIL`이 나오는지 확인",
+            "성공 응답에 cropped_image_url, cropped_image_size, confidence가 모두 있는지 확인",
+            "처리 시간이 10초 이상인 케이스에서 callback 방식이 끊기지 않는지 확인",
+        ],
+    },
+    "classify": {
+        "call_order": [
+            "백엔드는 Transform 성공 이미지의 `cropped_url`을 `image_url`로 넣어 `/v1/classify`를 호출한다.",
+            "LLM은 이미지를 분석해 태그, 색상, 스타일, 손톱 모양 후보를 만든다.",
+            "후보 값을 표준 태그 사전 값으로 매핑한다.",
+            "사전에 없는 값은 버리거나 가장 가까운 표준값으로 치환한다.",
+            "백엔드는 결과를 `Design.ai_tags`, `Design.ai_color_palette`, `Design.ai_style_category`에 저장한다.",
+        ],
+        "events": [
+            ["분류 성공", "표준 태그 매핑", "success 응답", "사전 외 태그가 있으면 백엔드 검증 실패"],
+            ["신뢰도 낮음", "confidence 기준 적용", "failed 또는 낮은 태그 제외", "기준 미확정이면 백엔드와 논의"],
+            ["여러 이미지 결과", "태그 병합 정책 적용", "디자인 단위 결과 저장", "병합 정책 없으면 임의 결정 금지"],
+        ],
+        "qa": [
+            "tags/color_palette/style_category가 표준 사전 안의 값만 반환되는지 확인",
+            "nail_shape를 저장할지 표시만 할지 정책이 문서와 맞는지 확인",
+            "max_tags=5 요청에서 tags가 5개를 넘지 않는지 확인",
+            "잘못된 이미지 URL에서 명확한 failed 응답이 오는지 확인",
+        ],
+    },
+    "errors": {
+        "call_order": [
+            "LLM은 실패 시 항상 `status=failed`, `error_code`, `error_message`를 반환한다.",
+            "백엔드는 error_code를 사장님 안내 문구로 변환한다.",
+            "재시도 가능한 오류와 사용자 조치가 필요한 오류를 구분한다.",
+            "최종 실패 시 디자인 또는 이미지 상태를 failed로 저장하고 재분석 버튼을 노출한다.",
+        ],
+        "events": [
+            ["NO_NAIL/LOW_QUALITY", "사용자 조치 필요", "재촬영 안내", "자동 재시도보다 사진 교체 우선"],
+            ["INTERNAL_ERROR", "시스템 오류", "자동 재시도 후보", "재시도 횟수 초과 시 failed"],
+            ["INAPPROPRIATE", "콘텐츠 차단", "업로드 불가 안내", "재시도하지 않음"],
+        ],
+        "qa": [
+            "모든 실패 응답에 error_code가 있는지 확인",
+            "프론트에 보여줄 문구가 백엔드 error_policy와 맞는지 확인",
+            "재시도 후 성공하면 failed 상태가 남지 않는지 확인",
+            "최종 실패 상태에서 재분석 버튼이 동작하는지 확인",
+        ],
+    },
+    "dictionary": {
+        "call_order": [
+            "Classify 모델 출력 후보를 만든다.",
+            "후보를 style/color/mood/technique/shape/style_category/occasion 사전에 매핑한다.",
+            "백엔드는 사전 외 값을 거부하거나 저장 전 제거한다.",
+            "태그 사전이 바뀌면 프론트 필터와 검색 인덱스를 함께 업데이트한다.",
+        ],
+        "events": [
+            ["새 태그 필요", "사전 수정", "LLM/백엔드/프론트 동시 반영", "모델만 임의 단어 출력 금지"],
+            ["사전 외 단어 반환", "백엔드 검증", "저장 거부 또는 제거", "검색 누락 방지"],
+        ],
+        "qa": [
+            "표준 사전 외 태그 샘플이 저장되지 않는지 확인",
+            "색상 필터 값과 color_palette 값이 일치하는지 확인",
+            "style_category enum 오타가 없는지 확인",
+            "사전 변경 후 AI 요약과 HTML을 재생성했는지 확인",
+        ],
+    },
+    "open-questions": {
+        "call_order": [
+            "구현 시작 전 동기/비동기 처리 방식을 결정한다.",
+            "callback을 쓴다면 인증 방식과 중복 callback 처리 규칙을 결정한다.",
+            "cropped 이미지 저장 주체와 URL 만료 시간을 결정한다.",
+            "confidence 실패 기준과 자동 재시도 횟수를 결정한다.",
+            "결정 후 `spec_text/12_llm.md`와 HTML/AI 요약을 재생성한다.",
+        ],
+        "events": [
+            ["정책 미정", "개발 보류 또는 임시 feature flag", "결정 기록 업데이트", "코드에 임의 기준 하드코딩 금지"],
+            ["정책 변경", "문서 재생성", "백엔드/LLM/프론트 영향 확인", "Notion 링크 최신화"],
+        ],
+        "qa": [
+            "callback 인증이 없는 상태로 외부 호출을 받지 않는지 확인",
+            "confidence 기준이 테스트 데이터에 적용되는지 확인",
+            "LLM URL 만료 전에 백엔드 저장이 끝나는지 확인",
+            "결정 항목이 spec_text/14_decisions.md에도 반영됐는지 확인",
+        ],
+    },
+}
+
+
 PIPELINE_MAP = [
     {
         "id": "flow",
@@ -416,6 +537,7 @@ def resolve_step(mapping, backend, llm_spec, source_sections):
     return {
         **mapping,
         "plain_language": STEP_PLAIN_LANGUAGE.get(mapping["id"], []),
+        "playbook": LLM_STEP_PLAYBOOKS.get(mapping["id"], {}),
         "contract": contract_from_llm_spec(llm_spec, mapping.get("contract_key")),
         "source_refs": source_refs,
         "file_refs": file_refs_for(mapping.get("backend_files", [])),
@@ -499,6 +621,19 @@ def build_ai_brief(index):
         if step.get("checkpoints"):
             lines.append("체크포인트:")
             lines.extend(f"- {row}" for row in step["checkpoints"])
+        playbook = step.get("playbook") or {}
+        if playbook.get("call_order"):
+            lines.append("처리/API 순서:")
+            lines.extend(f"- {row}" for row in playbook["call_order"])
+        if playbook.get("events"):
+            lines.append("이벤트별 처리:")
+            lines.extend(
+                f"- {trigger} -> {process} -> 성공: {success} / 실패: {failure}"
+                for trigger, process, success, failure in playbook["events"]
+            )
+        if playbook.get("qa"):
+            lines.append("QA/계약 테스트:")
+            lines.extend(f"- [ ] {row}" for row in playbook["qa"])
         if step.get("contract"):
             contract = step["contract"]
             lines.append(f"Endpoint: {contract['endpoint']}")
@@ -879,6 +1014,9 @@ HTML_TEMPLATE = """<!doctype html>
         step.summary,
         ...(step.guide || []),
         ...(step.checkpoints || []),
+        ...(step.playbook?.call_order || []),
+        ...(step.playbook?.qa || []),
+        ...(step.playbook?.events || []).flat(),
         ...(step.field_refs || []).map((ref) => `${ref.entity} ${ref.name} ${ref.note}`),
         ...(step.api_refs || []).map((ref) => `${ref.endpoint} ${ref.purpose} ${ref.params}`),
         step.contract?.endpoint || "",
@@ -964,6 +1102,21 @@ HTML_TEMPLATE = """<!doctype html>
       const checkpoints = step.checkpoints?.length
         ? `<ul>${step.checkpoints.map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ul>`
         : `<div class="meta">등록된 체크포인트 없음</div>`;
+      const playbook = step.playbook || {};
+      const callOrder = playbook.call_order?.length
+        ? `<ol>${playbook.call_order.map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ol>`
+        : `<div class="meta">등록된 처리 순서 없음</div>`;
+      const qaRows = playbook.qa?.length
+        ? `<ul>${playbook.qa.map((row) => `<li><label><input type="checkbox"> ${escapeHtml(row)}</label></li>`).join("")}</ul>`
+        : `<div class="meta">등록된 QA/계약 테스트 없음</div>`;
+      const eventRows = (playbook.events || []).map((row) => `
+        <tr>
+          <td>${escapeHtml(row[0])}</td>
+          <td>${escapeHtml(row[1])}</td>
+          <td>${escapeHtml(row[2])}</td>
+          <td>${escapeHtml(row[3])}</td>
+        </tr>
+      `).join("");
       const sourceRows = step.source_refs.map((ref) => `
         <tr><td>${link(ref.href, ref.title)}</td><td>${escapeHtml(ref.line)}</td></tr>
       `).join("");
@@ -1003,6 +1156,9 @@ HTML_TEMPLATE = """<!doctype html>
         </div>
         <div class="grid">
           <div class="panel full"><h3>이 단계의 의미</h3>${plain}</div>
+          <div class="panel full"><h3>처리/API 순서</h3>${callOrder}</div>
+          <div class="panel full"><h3>이벤트별 구현 지시서</h3><table><thead><tr><th>이벤트</th><th>처리</th><th>성공 시</th><th>실패 시</th></tr></thead><tbody>${eventRows || "<tr><td colspan='4'>등록된 이벤트 없음</td></tr>"}</tbody></table></div>
+          <div class="panel full"><h3>QA / 계약 테스트</h3>${qaRows}</div>
           <div class="panel full"><h3>LLM 작업자 구현 가이드</h3>${guide}</div>
           <div class="panel full"><h3>Input / Output 계약</h3>${renderContract(step.contract)}</div>
           <div class="panel"><h3>체크포인트</h3>${checkpoints}</div>

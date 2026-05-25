@@ -438,6 +438,264 @@ IMPLEMENTATION_GUIDES = {
 }
 
 
+SCREEN_PLAYBOOKS = {
+    "1": {
+        "api_sequence": [
+            "앱 진입 시 저장된 토큰이 있으면 `GET /owner/me`를 먼저 호출한다.",
+            "토큰이 없거나 401이면 로그인 화면을 보여준다.",
+            "회원가입 제출 시 `POST /owner/auth/register`를 호출하고 성공하면 사업자 인증 제출 화면으로 이동한다.",
+            "로그인 성공 후 다시 `GET /owner/me`를 호출해 `verification_status` 기준으로 화면을 분기한다.",
+            "사업자 인증 제출 또는 재제출은 `POST /owner/business-verification`로 처리한다.",
+        ],
+        "ui_events": [
+            ["회원가입 버튼", "POST /owner/auth/register", "가입 완료 후 사업자 인증 화면 이동", "VALIDATION_ERROR면 필드별 메시지 표시"],
+            ["로그인 버튼", "POST /owner/auth/login -> GET /owner/me", "승인 상태에 맞는 첫 화면 이동", "401이면 이메일/비밀번호 확인 안내"],
+            ["사업자 인증 제출", "POST /owner/business-verification", "pending 안내 화면 표시", "파일/사업자번호 오류를 입력칸 아래 표시"],
+            ["비밀번호 재설정 요청", "POST /owner/auth/password-reset/request", "항상 같은 완료 안내 표시", "서버 오류만 공통 오류 표시"],
+        ],
+        "states": [
+            "anonymous: 로그인/회원가입만 노출",
+            "pending: 초안 작성 가능, 공개/예약 처리 버튼 비활성화",
+            "rejected: 반려 사유 표시 + 재제출 버튼 노출",
+            "approved: 대시보드와 운영 기능 진입 허용",
+        ],
+        "qa": [
+            "토큰 없이 `/owner/me` 호출 실패 시 로그인 화면으로 이동하는지 확인",
+            "pending 계정으로 공개 버튼을 눌렀을 때 `VERIFICATION_REQUIRED` 안내가 나오는지 확인",
+            "rejected 계정에서 재제출 후 pending 화면으로 바뀌는지 확인",
+            "미가입 이메일 비밀번호 재설정 요청도 동일한 완료 문구를 보여주는지 확인",
+        ],
+    },
+    "2": {
+        "api_sequence": [
+            "샵 설정 화면 진입 시 `GET /owner/shop`을 호출한다.",
+            "샵이 없으면 빈 초안 폼을 보여주고 저장 시 `POST /owner/shop`을 호출한다.",
+            "샵이 있으면 기본 정보 수정은 `PATCH /owner/shop`, 영업시간은 `PATCH /owner/shop/business-hours`로 나눈다.",
+            "예약 정책은 `PATCH /owner/shop/reservation-policy`, 결제 방식은 `PATCH /owner/shop/payment-method`로 저장한다.",
+            "공개/숨김 토글은 `PATCH /owner/shop/visibility`를 호출하되 승인 전에는 버튼을 비활성화한다.",
+        ],
+        "ui_events": [
+            ["기본 정보 저장", "PATCH /owner/shop 또는 POST /owner/shop", "저장 완료 토스트 + 화면 값 갱신", "주소/전화번호 오류를 필드별 표시"],
+            ["영업시간 저장", "PATCH /owner/shop/business-hours", "캘린더/예약 가능 시간 재계산 안내", "시간 겹침 오류 표시"],
+            ["결제 방식 저장", "PATCH /owner/shop/payment-method", "결제 안내 미리보기 갱신", "계좌 필수값 누락 표시"],
+            ["공개 토글", "PATCH /owner/shop/visibility", "active/hidden 배지 갱신", "VERIFICATION_REQUIRED면 인증 안내 모달 표시"],
+        ],
+        "states": [
+            "no_shop: 샵 초안 생성 폼",
+            "draft_allowed: 승인 전 초안 수정 가능",
+            "active: 고객 검색/예약 진입 가능",
+            "hidden: 고객에게 숨김, 사장님 수정은 가능",
+        ],
+        "qa": [
+            "승인 전 샵 초안 저장은 성공하지만 공개 전환은 막히는지 확인",
+            "`auto_accept=true`와 `bank_transfer_guide` 조합을 프론트에서 선택 불가로 막는지 확인",
+            "계좌이체 선택 시 예약금/은행/계좌번호/예금주가 모두 필수인지 확인",
+            "이미지 저장 후 새로고침해도 썸네일과 이미지 목록이 유지되는지 확인",
+        ],
+    },
+    "3": {
+        "api_sequence": [
+            "디자이너 관리 화면 진입 시 `GET /owner/designers`를 호출한다.",
+            "추가 버튼은 `POST /owner/designers`, 상세 진입은 `GET /owner/designers/{designer_id}`를 호출한다.",
+            "기본 정보 수정은 `PATCH /owner/designers/{designer_id}`로 저장한다.",
+            "주간 근무시간은 `PATCH /owner/designers/{designer_id}/schedule`, 임시 휴무는 `POST /owner/designers/{designer_id}/time-off`로 저장한다.",
+            "삭제/비활성화 버튼은 `DELETE /owner/designers/{designer_id}`를 호출한 뒤 목록을 다시 불러온다.",
+        ],
+        "ui_events": [
+            ["디자이너 추가", "POST /owner/designers", "목록 상단에 새 디자이너 표시", "이름/직급 필수 오류 표시"],
+            ["근무시간 저장", "PATCH /owner/designers/{designer_id}/schedule", "예약 가능 시간 갱신 안내", "시간 범위 오류 표시"],
+            ["임시 휴무 추가", "POST /owner/designers/{designer_id}/time-off", "해당 날짜 예약 불가 표시", "이미 예약이 있으면 충돌 안내"],
+            ["비활성화", "DELETE /owner/designers/{designer_id}", "신규 예약 후보에서 제외", "기존 예약 존재 시 안내 표시"],
+        ],
+        "states": [
+            "active: 신규 예약 후보에 노출",
+            "inactive: 기존 예약은 남기고 신규 후보에서 제외",
+            "empty: 디자이너 없음 안내 + 추가 버튼",
+        ],
+        "qa": [
+            "디자이너가 0명일 때 빈 상태와 추가 버튼이 보이는지 확인",
+            "비활성 디자이너가 디자인 가능 디자이너 선택지에서 빠지는지 확인",
+            "근무시간 변경 후 예약 가능 슬롯 화면이 갱신되는지 확인",
+            "임시 휴무일에 신규 예약이 막히는지 확인",
+        ],
+    },
+    "4": {
+        "api_sequence": [
+            "디자인 목록 진입 시 `GET /owner/designs?visibility=&ai_analysis_status=`를 호출한다.",
+            "등록 폼 저장 시 이미지 1~5장과 필수값을 검증한 뒤 `POST /owner/designs`를 호출한다.",
+            "상세 화면은 `GET /owner/designs/{design_id}`로 최신 AI 분석 상태를 조회한다.",
+            "수정 저장은 `PATCH /owner/designs/{design_id}`를 호출한다.",
+            "이미지 추가/삭제 후에는 `POST /owner/designs/{design_id}/images` 또는 `DELETE /owner/designs/{design_id}/images/{image_id}`를 호출하고 분석 상태를 pending으로 보여준다.",
+            "재분석 버튼은 `POST /owner/designs/{design_id}/reanalyze`를 호출한다.",
+        ],
+        "ui_events": [
+            ["디자인 등록", "POST /owner/designs", "목록으로 이동 + 분석 중 배지 표시", "필수값/이미지 개수 오류 표시"],
+            ["이미지 추가", "POST /owner/designs/{design_id}/images", "이미지 목록 갱신 + 분석 중 전환", "5장 초과 시 업로드 막기"],
+            ["재분석", "POST /owner/designs/{design_id}/reanalyze", "분석 중 배지로 변경", "failed가 아니어도 수동 재분석 허용 여부 확인"],
+            ["공개/숨김", "PATCH /owner/designs/{design_id}/visibility", "active/hidden 배지 갱신", "승인 전이면 인증 안내"],
+        ],
+        "states": [
+            "pending/in_progress: 분석 중, 고객에게 아직 노출되지 않음",
+            "done + active: 고객 노출 가능",
+            "failed: 분석 실패, 재분석 또는 이미지 교체 버튼 표시",
+            "hidden: 사장님만 볼 수 있음",
+        ],
+        "qa": [
+            "이미지 0장 또는 6장 이상 등록이 프론트에서 막히는지 확인",
+            "등록 직후 분석 완료 전까지 고객 노출 가능 문구가 나오지 않는지 확인",
+            "AI 분석 실패 상태에서 재분석 버튼이 보이는지 확인",
+            "`owner_tags` 없이도 등록 가능한지 확인",
+        ],
+    },
+    "5": {
+        "api_sequence": [
+            "예약 화면 진입 시 `GET /owner/reservations?from=&to=&status=`를 호출한다.",
+            "상세 모달을 열 때 `GET /owner/reservations/{id}`로 최신 상태를 다시 조회한다.",
+            "수락은 `POST /owner/reservations/{id}/accept`, 거절은 `POST /owner/reservations/{id}/reject`를 호출한다.",
+            "계좌이체 예약에서 입금 확인 버튼은 `POST /owner/reservations/{id}/payment-confirmed`를 호출한다.",
+            "완료/노쇼/취소는 각각 complete/no-show/cancel API를 호출한 뒤 목록과 상세를 다시 불러온다.",
+        ],
+        "ui_events": [
+            ["예약 수락", "POST /owner/reservations/{id}/accept", "현장결제면 confirmed, 계좌이체면 payment_pending 표시", "CONFLICT면 이미 선점된 시간 안내"],
+            ["입금 확인", "POST /owner/reservations/{id}/payment-confirmed", "confirmed로 변경 + 캘린더 확정 표시", "이미 처리된 예약이면 새로고침 안내"],
+            ["예약 거절", "POST /owner/reservations/{id}/reject", "rejected로 변경 + 목록에서 제거 또는 상태 갱신", "필수 사유 누락 표시"],
+            ["노쇼 처리", "POST /owner/reservations/{id}/no-show", "no_show 배지 표시", "시작 30분 전이면 버튼 비활성화"],
+        ],
+        "states": [
+            "pending: 사장님 수락/거절 대기, created_at 오름차순 표시",
+            "payment_pending: 유저 입금 및 사장 확인 대기",
+            "confirmed: 예약 확정, 완료/노쇼 가능 시점 대기",
+            "completed/no_show/cancelled/rejected: 읽기 중심 상태",
+        ],
+        "qa": [
+            "pending 목록이 예약 요청 생성 순서대로 보이는지 확인",
+            "유저가 [입금 완료]를 눌러도 confirmed가 되지 않고 사장 확인 버튼이 남는지 확인",
+            "동일 시간대 중복 수락 시 CONFLICT 안내가 나오는지 확인",
+            "confirmed 예약 시작 30분 전에는 노쇼 버튼이 비활성화되는지 확인",
+        ],
+    },
+    "6": {
+        "api_sequence": [
+            "리뷰 화면 진입 시 `GET /owner/reviews?sort=&unanswered=&cursor=`를 호출한다.",
+            "대시보드 미답변 리뷰 카드에서 진입하면 `unanswered=true`를 붙인다.",
+            "답변 작성은 `POST /reviews/{id}/reply`, 수정은 `PATCH /reviews/{id}/reply`, 삭제는 `DELETE /reviews/{id}/reply`를 호출한다.",
+            "답변 변경 후 해당 리뷰 row 또는 목록을 다시 불러온다.",
+        ],
+        "ui_events": [
+            ["답변 작성", "POST /reviews/{id}/reply", "답변 영역 표시 + 미답변 뱃지 제거", "이미 답변 있으면 수정 모드로 전환"],
+            ["답변 수정", "PATCH /reviews/{id}/reply", "수정된 답변 표시", "권한 오류면 내 샵 리뷰가 아님 안내"],
+            ["답변 삭제", "DELETE /reviews/{id}/reply", "미답변 상태로 변경", "삭제 확인 모달 제공"],
+            ["정렬 변경", "GET /owner/reviews", "목록 재조회", "빈 결과면 빈 상태 표시"],
+        ],
+        "states": [
+            "unanswered: 답변 작성 버튼 표시",
+            "answered: 수정/삭제 버튼 표시",
+            "empty: 리뷰 없음 또는 미답변 없음 안내",
+        ],
+        "qa": [
+            "리뷰당 답변이 1개만 작성되는지 확인",
+            "미답변 필터에서 답변 작성 후 목록에서 사라지거나 상태가 바뀌는지 확인",
+            "정렬 변경 후 cursor가 초기화되는지 확인",
+            "내 샵이 아닌 리뷰 답변 시 권한 오류가 처리되는지 확인",
+        ],
+    },
+    "7": {
+        "api_sequence": [
+            "스네일 화면 진입 시 `GET /owner/snaps?cursor=`를 호출한다.",
+            "게시물 상세은 `GET /snaps/{id}`로 불러온다.",
+            "댓글 목록은 `GET /snaps/{id}/comments`를 호출한다.",
+            "샵 계정 댓글 작성/수정/삭제는 comments API를 그대로 사용한다.",
+        ],
+        "ui_events": [
+            ["스네일 상세 열기", "GET /snaps/{id}", "이미지/태그/댓글 영역 표시", "삭제된 게시물이면 목록에서 제거"],
+            ["샵 댓글 작성", "POST /snaps/{id}/comments", "샵 뱃지 붙은 댓글 추가", "빈 댓글 입력 방지"],
+            ["댓글 수정", "PATCH /comments/{id}", "수정된 댓글 반영", "내 샵 댓글이 아니면 버튼 숨김"],
+            ["댓글 삭제", "DELETE /comments/{id}", "댓글 목록 갱신", "삭제 확인 모달 제공"],
+        ],
+        "states": [
+            "tagged_snap: 내 샵이 태그된 게시물",
+            "shop_comment: author_type=shop 댓글로 표시",
+            "empty: 태그된 스네일 없음 안내",
+        ],
+        "qa": [
+            "내 샵이 태그된 스네일만 보이는지 확인",
+            "샵 댓글에 일반 유저와 다른 뱃지가 붙는지 확인",
+            "내가 작성하지 않은 댓글에는 수정/삭제 버튼이 없는지 확인",
+            "MVP 제외인 신고 플로우가 화면에 노출되지 않는지 확인",
+        ],
+    },
+    "8": {
+        "api_sequence": [
+            "대시보드 진입 시 `GET /owner/dashboard/summary`를 호출한다.",
+            "카드 클릭 시 해당 기능 화면으로 이동하고 필요한 query filter를 붙인다.",
+            "새 예약 요청 카드는 예약 화면 `status=pending`, 미답변 리뷰 카드는 리뷰 화면 `unanswered=true`로 이동한다.",
+        ],
+        "ui_events": [
+            ["오늘 예약 카드", "라우팅", "예약 화면 오늘 날짜 필터", "데이터 0건이면 빈 상태"],
+            ["신규 예약 요청 카드", "라우팅", "예약 화면 pending 필터", "필터가 URL에 남는지 확인"],
+            ["미답변 리뷰 카드", "라우팅", "리뷰 화면 unanswered=true", "답변 후 숫자 갱신"],
+            ["최근 스네일 카드", "라우팅", "스네일 화면 이동", "목록 빈 상태 표시"],
+        ],
+        "states": [
+            "loading: 카드 skeleton 표시",
+            "loaded: 4개 지표 표시",
+            "empty_zero: 0도 정상 수치로 표시",
+        ],
+        "qa": [
+            "대시보드 API 한 번으로 4개 카드가 모두 채워지는지 확인",
+            "카드 클릭 시 올바른 필터가 적용되는지 확인",
+            "새로고침해도 필터 상태가 유지되는지 확인",
+            "API 실패 시 카드별 공통 오류 상태가 보이는지 확인",
+        ],
+    },
+    "9": {
+        "api_sequence": [
+            "알림함 진입 시 `GET /owner/notifications?cursor=`를 호출한다.",
+            "상단 뱃지는 `GET /owner/notifications/unread-count`를 호출해 표시한다.",
+            "알림 클릭 시 먼저 `PATCH /owner/notifications/{notification_id}/read`를 호출하고 `deeplink_target`으로 이동한다.",
+            "모두 읽음은 `POST /owner/notifications/read-all`을 호출한 뒤 unread count를 0으로 갱신한다.",
+        ],
+        "ui_events": [
+            ["알림 클릭", "PATCH read + 라우팅", "읽음 처리 후 관련 화면 이동", "이동 대상이 없으면 알림 상세만 표시"],
+            ["모두 읽음", "POST /owner/notifications/read-all", "모든 알림 읽음 상태 + 뱃지 0", "실패 시 재시도 토스트"],
+            ["더 보기", "GET /owner/notifications?cursor=", "다음 페이지 append", "has_next=false면 버튼 숨김"],
+        ],
+        "states": [
+            "unread: 강조 표시 + 뱃지 카운트 포함",
+            "read: 일반 표시",
+            "empty: 알림 없음 안내",
+        ],
+        "qa": [
+            "읽지 않은 알림 클릭 후 뱃지 숫자가 줄어드는지 확인",
+            "deeplink_target이 예약/리뷰/스네일 화면으로 올바르게 이동하는지 확인",
+            "모두 읽음 후 새로고침해도 읽음 상태가 유지되는지 확인",
+            "카카오 실패와 무관하게 웹 알림함에는 알림이 남는지 확인",
+        ],
+    },
+    "10": {
+        "api_sequence": [
+            "구현 전 미정 항목을 `spec_text/14_decisions.md`와 `spec_text/15_checklist.md`에서 확인한다.",
+            "미정 항목이 화면 구현에 영향을 주면 프론트 임의 결정 대신 백엔드/기획 확인을 요청한다.",
+            "결정이 바뀌면 `python tools\\build_all_collaboration_outputs.py`로 HTML과 AI 요약을 다시 생성한다.",
+        ],
+        "ui_events": [
+            ["미정 정책 발견", "API 호출 없음", "결정 필요 목록에 기록", "임의 구현 금지"],
+            ["결정 반영", "문서 재생성", "HTML/AI 요약 갱신", "Notion 링크 업데이트 여부 확인"],
+        ],
+        "states": [
+            "open: 아직 결정 필요",
+            "decided: 구현 가능",
+            "changed: 기존 구현 영향 확인 필요",
+        ],
+        "qa": [
+            "미정 정책이 코드에 하드코딩되지 않았는지 확인",
+            "결정 변경 후 관련 화면의 버튼/문구/API 호출이 함께 바뀌었는지 확인",
+            "HTML과 AI 요약을 재생성해 Notion 링크가 최신인지 확인",
+        ],
+    },
+}
+
+
 def read_text(path):
     return path.read_text(encoding="utf-8")
 
@@ -610,6 +868,7 @@ def resolve_mapping(mapping, backend, front_sections):
     return {
         **mapping,
         "implementation_guides": IMPLEMENTATION_GUIDES.get(mapping["id"], []),
+        "playbook": SCREEN_PLAYBOOKS.get(mapping["id"], {}),
         "front_refs": resolved_sections,
         "field_refs": field_refs,
         "api_refs": api_refs,
@@ -666,6 +925,22 @@ def build_ai_brief(index):
         if item.get("checkpoints"):
             lines.append("체크포인트:")
             lines.extend(f"- {checkpoint}" for checkpoint in item["checkpoints"])
+        playbook = item.get("playbook") or {}
+        if playbook.get("api_sequence"):
+            lines.append("API 호출 순서:")
+            lines.extend(f"- {row}" for row in playbook["api_sequence"])
+        if playbook.get("ui_events"):
+            lines.append("버튼/이벤트 처리:")
+            lines.extend(
+                f"- {trigger} -> {api} -> 성공: {success} / 실패: {failure}"
+                for trigger, api, success, failure in playbook["ui_events"]
+            )
+        if playbook.get("states"):
+            lines.append("화면 상태:")
+            lines.extend(f"- {row}" for row in playbook["states"])
+        if playbook.get("qa"):
+            lines.append("QA 체크리스트:")
+            lines.extend(f"- [ ] {row}" for row in playbook["qa"])
         if item.get("field_refs"):
             field_names = ", ".join(f"{ref['entity']}.{ref['name']}" for ref in item["field_refs"])
             lines.append(f"관련 필드: {field_names}")
@@ -1123,6 +1398,10 @@ HTML_TEMPLATE = """<!doctype html>
         item.title,
         item.summary,
         ...(item.keywords || []),
+        ...(item.playbook?.api_sequence || []),
+        ...(item.playbook?.states || []),
+        ...(item.playbook?.qa || []),
+        ...(item.playbook?.ui_events || []).flat(),
         ...(item.field_refs || []).map((ref) => `${ref.entity} ${ref.name} ${ref.note}`),
         ...(item.api_refs || []).map((ref) => `${ref.group} ${ref.endpoint} ${ref.purpose} ${ref.params}`),
       ].join(" ").toLowerCase();
@@ -1170,6 +1449,24 @@ HTML_TEMPLATE = """<!doctype html>
       const checkpoints = item.checkpoints?.length
         ? `<ul>${item.checkpoints.map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ul>`
         : "<div class='meta'>등록된 체크 포인트 없음</div>";
+      const playbook = item.playbook || {};
+      const apiSequence = playbook.api_sequence?.length
+        ? `<ol>${playbook.api_sequence.map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ol>`
+        : "<div class='meta'>등록된 API 호출 순서 없음</div>";
+      const stateRows = playbook.states?.length
+        ? `<ul>${playbook.states.map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ul>`
+        : "<div class='meta'>등록된 화면 상태 없음</div>";
+      const qaRows = playbook.qa?.length
+        ? `<ul>${playbook.qa.map((row) => `<li><label><input type="checkbox"> ${escapeHtml(row)}</label></li>`).join("")}</ul>`
+        : "<div class='meta'>등록된 QA 체크리스트 없음</div>";
+      const eventRows = (playbook.ui_events || []).map((row) => `
+        <tr>
+          <td>${escapeHtml(row[0])}</td>
+          <td><code>${escapeHtml(row[1])}</code></td>
+          <td>${escapeHtml(row[2])}</td>
+          <td>${escapeHtml(row[3])}</td>
+        </tr>
+      `).join("");
       const missing = [...(item.missing_front_sections || []), ...(item.missing_refs || [])];
       const missingPanel = missing.length
         ? `<div class="panel full"><h3>확인 필요</h3><ul>${missing.map((row) => `<li><code>${escapeHtml(row)}</code></li>`).join("")}</ul></div>`
@@ -1211,6 +1508,10 @@ HTML_TEMPLATE = """<!doctype html>
           <span class="chip ${statusClass(item)}">${statusLabel(item)} · ${Math.round(item.coverage * 100)}%</span>
         </div>
         <div class="grid">
+          <div class="panel full"><h3>화면별 API 호출 순서</h3>${apiSequence}</div>
+          <div class="panel full"><h3>버튼/이벤트 구현 지시서</h3><table><thead><tr><th>화면 이벤트</th><th>호출 API</th><th>성공 시</th><th>실패 시</th></tr></thead><tbody>${eventRows || "<tr><td colspan='4'>등록된 이벤트 없음</td></tr>"}</tbody></table></div>
+          <div class="panel"><h3>화면 상태 규칙</h3>${stateRows}</div>
+          <div class="panel"><h3>QA 체크리스트</h3>${qaRows}</div>
           <div class="panel full"><h3>구현 분석 가이드</h3>${implementationGuides}</div>
           <div class="panel"><h3>프론트 섹션</h3><table><thead><tr><th>ID</th><th>제목</th><th>라인</th></tr></thead><tbody>${frontRows || "<tr><td colspan='3'>연결된 섹션 없음</td></tr>"}</tbody></table></div>
           <div class="panel"><h3>체크 포인트</h3>${checkpoints}</div>

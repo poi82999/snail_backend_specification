@@ -29,7 +29,7 @@ python tools\build_owner_webapp_index.py
 ```
 
 위 명령은 `references/snail_owner_webapp_spec_v1.md`와 `spec_text/*.md`를 연결해 `outputs/owner_webapp_backend_index.html` 비주얼라이저와 `outputs/owner_webapp_backend_index.json` 색인 데이터를 생성합니다.
-사장님 웹앱 프론트 작업자는 HTML 파일을 열어 기능별 관련 백엔드 필드/API를 빠르게 찾을 수 있습니다.
+사장님 웹앱 프론트 작업자는 HTML 파일에서 기능별 관련 백엔드 필드/API뿐 아니라 화면별 API 호출 순서, 버튼/이벤트 처리, 화면 상태 규칙, QA 체크리스트를 확인할 수 있습니다.
 AI 코딩 도구에 넣을 압축 컨텍스트는 HTML 상단의 `AI 요약 복사` 버튼 또는 `outputs/owner_webapp_backend_index.ai.txt`를 사용합니다.
 
 ```powershell
@@ -37,7 +37,7 @@ python tools\build_llm_pipeline_index.py
 ```
 
 위 명령은 `references/snail_llm_pipeline_integration_guide.md`와 `spec_text/*.md`를 연결해 `outputs/llm_pipeline_backend_index.html` 비주얼라이저와 `outputs/llm_pipeline_backend_index.json` 색인 데이터를 생성합니다.
-LLM 작업자는 Transform/Classify 계약, 에러 코드, 표준 태그 사전, 백엔드 저장 필드/API를 한 화면에서 확인할 수 있습니다.
+LLM 작업자는 Transform/Classify 계약, 에러 코드, 표준 태그 사전, 백엔드 저장 필드/API와 함께 처리 순서, 이벤트별 처리, QA/계약 테스트를 한 화면에서 확인할 수 있습니다.
 AI 코딩 도구에 넣을 압축 컨텍스트는 HTML 상단의 `AI 요약 복사` 버튼 또는 `outputs/llm_pipeline_backend_index.ai.txt`를 사용합니다.
 
 ```powershell
