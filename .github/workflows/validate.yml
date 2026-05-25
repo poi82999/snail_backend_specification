@@ -1,0 +1,35 @@
+name: Validate Spec Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'spec_text/**'
+      - 'tools/**'
+      - 'references/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'spec_text/**'
+      - 'tools/**'
+      - 'references/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install openpyxl
+
+      - name: Build all outputs
+        run: python tools/build_all_collaboration_outputs.py
+
+      - name: Run spec sync validation
+        run: python tools/validate_spec_sync.py --strict

@@ -22,6 +22,11 @@ STEPS = [
         [sys.executable, str(ROOT / "tools" / "build_llm_pipeline_index.py")],
         "LLM 파이프라인 연동 가이드와 백엔드 필드/API 바인딩 HTML을 재생성합니다.",
     ),
+    (
+        "validate_spec_sync",
+        [sys.executable, str(ROOT / "tools" / "validate_spec_sync.py")],
+        "Playbook 텍스트의 API 참조가 spec JSON과 일치하는지 교차 검증합니다.",
+    ),
 ]
 
 

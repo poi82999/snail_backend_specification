@@ -280,7 +280,7 @@ OWNER_SECTION_MAP = [
         },
         "keywords": ["review", "reply", "rating"],
         "checkpoints": [
-            "사장님 전용 리뷰 목록은 `GET /owner/reviews`를 사용합니다. 사장님 토큰만 있으면 자동으로 내 샵 리뷰만 조회됩니다. `GET /shops/{id}/reviews`는 일반 고객용이므로 사장님 웹에서는 쓸 필요 없습니다.",
+            "사장님 전용 리뷰 목록은 `{api:review:reviews}`를 사용합니다. 사장님 토큰만 있으면 자동으로 내 샵 리뷰만 조회됩니다. `{api:review:reviews}`는 일반 고객용이므로 사장님 웹에서는 쓸 필요 없습니다.",
             "대시보드의 unanswered_review_count는 shop_reply IS NULL 기준.",
         ],
     },
@@ -324,7 +324,7 @@ OWNER_SECTION_MAP = [
         },
         "keywords": ["snap", "comment", "shop-badge"],
         "checkpoints": [
-            "사장님 전용 스네일 목록은 `GET /owner/snaps`를 사용합니다. 사장님 토큰만 있으면 자동으로 내 샵이 태그된 스네일만 조회됩니다. `GET /shops/{id}/snaps`는 일반 유저용이므로 사장님 웹에서는 쓸 필요 없습니다.",
+            "사장님 전용 스네일 목록은 `{api:snap:snaps}`를 사용합니다. 사장님 토큰만 있으면 자동으로 내 샵이 태그된 스네일만 조회됩니다. `{api:snap:snaps}`는 일반 유저용이므로 사장님 웹에서는 쓸 필요 없습니다.",
             "샵 계정 댓글은 Comment.author_type/author_shop_id로 구분.",
         ],
     },
@@ -397,7 +397,7 @@ OWNER_SECTION_MAP = [
 
 IMPLEMENTATION_GUIDES = {
     "1": [
-        "초기 진입: 로컬 스토리지에 토큰이 있다면 가장 먼저 `GET /owner/me` API를 호출해서 현재 사장님의 가입/승인 상태(`verification_status`)를 확인해주세요.",
+        "초기 진입: 로컬 스토리지에 토큰이 있다면 가장 먼저 `{api:owner_auth:me}` API를 호출해서 현재 사장님의 가입/승인 상태(`verification_status`)를 확인해주세요.",
         "미인증 처리: 토큰이 아예 없거나 API 호출 결과로 `401 Unauthorized` 에러가 발생한다면, 유저가 당황하지 않게 자연스럽게 '로그인 화면'으로 이동시켜주세요.",
         "인증 상태 분기: `VERIFICATION_REQUIRED` 에러는 '사업자 승인 대기/반려' 상태라는 뜻입니다. 완전 권한이 없는 `FORBIDDEN`과 명확히 구분해서, '사업자 인증 서류 제출 화면'으로 예쁘게 연결시켜주세요.",
         "비밀번호 재설정: 가입되지 않은 이메일로 재설정 요청이 들어오더라도 동일한 완료 메시지를 띄워주세요. (보안상 유저 정보 존재 여부를 노출하지 않기 위함입니다.)"
@@ -439,7 +439,7 @@ IMPLEMENTATION_GUIDES = {
     ],
     "9": [
         "알림 채널 전략: MVP에서는 브라우저 웹푸시(Web Push) 알림을 지원하지 않습니다. 대신 유저의 카카오 알림톡으로 발송하며, 동시에 웹 알림함(inbox)에 데이터를 차곡차곡 쌓아줍니다. 알림함 종모양 아이콘을 메인 채널로 구성해주세요.",
-        "읽음 처리 + 이동 동기화: 유저가 새 알림을 클릭하면, 먼저 `PATCH /owner/notifications/{id}/read` API를 찔러 읽음 처리를 한 직후에, 알림 데이터에 있는 `deeplink_target` URL로 즉시 이동시켜주세요.",
+        "읽음 처리 + 이동 동기화: 유저가 새 알림을 클릭하면, 먼저 `{api:owner_notification:read}` API를 찔러 읽음 처리를 한 직후에, 알림 데이터에 있는 `deeplink_target` URL로 즉시 이동시켜주세요.",
         "알림함의 역할: 가끔 카카오 발송이 실패하더라도 웹 알림함 데이터는 무조건 생성되므로(신뢰성 100%), 사장님이 놓치는 일이 없도록 알림함 UI를 직관적으로 만들어주세요."
     ],
     "10": [
@@ -452,12 +452,12 @@ IMPLEMENTATION_GUIDES = {
 SCREEN_PLAYBOOKS = {
     "1": {
         "api_sequence": [
-            "[초기 진입]: 사용자가 앱을 켰을 때 로컬 스토리지에 토큰이 있다면, 가장 먼저 `GET /owner/me` API를 호출해서 현재 사장님의 가입/승인 상태를 확인해주세요.",
+            "[초기 진입]: 사용자가 앱을 켰을 때 로컬 스토리지에 토큰이 있다면, 가장 먼저 `{api:owner_auth:me}` API를 호출해서 현재 사장님의 가입/승인 상태를 확인해주세요.",
             "[미인증 처리]: 토큰이 아예 없거나 API 호출 결과로 `401 Unauthorized` 에러가 발생한다면, 당황하지 않고 자연스럽게 '로그인 화면'으로 이동시켜주세요.",
-            "[회원가입 흐름]: 회원가입 폼을 다 채우고 [가입하기] 버튼을 누르면 `POST /owner/auth/register`를 호출합니다. 성공(200) 응답을 받으면 지체 없이 '사업자 인증 서류 제출 화면'으로 넘겨주시면 됩니다.",
-            "[로그인 성공 후]: 토큰을 새로 받았다면 다시 `GET /owner/me`를 호출하여 `verification_status`를 보고, 승인되었으면 대시보드로, 대기 중이면 안내 화면으로 분기해주세요.",
-            "[사업자 서류 제출]: 사업자 등록증 사진과 번호를 입력해 제출(또는 재제출)할 때는 `POST /owner/business-verification` API를 호출하여 처리합니다.",
-            "[비밀번호 재설정 완료]: 이메일에서 재설정 링크를 클릭한 사장님이 새 비밀번호를 입력하고 [변경하기] 버튼을 누르면 `POST /owner/auth/password-reset/confirm`을 호출합니다. 토큰은 15분 유효, 1회만 사용 가능합니다."
+            "[회원가입 흐름]: 회원가입 폼을 다 채우고 [가입하기] 버튼을 누르면 `{api:owner_auth:register}`를 호출합니다. 성공(200) 응답을 받으면 지체 없이 '사업자 인증 서류 제출 화면'으로 넘겨주시면 됩니다.",
+            "[로그인 성공 후]: 토큰을 새로 받았다면 다시 `{api:owner_auth:me}`를 호출하여 `verification_status`를 보고, 승인되었으면 대시보드로, 대기 중이면 안내 화면으로 분기해주세요.",
+            "[사업자 서류 제출]: 사업자 등록증 사진과 번호를 입력해 제출(또는 재제출)할 때는 `{api:owner_auth:business-verification}` API를 호출하여 처리합니다.",
+            "[비밀번호 재설정 완료]: 이메일에서 재설정 링크를 클릭한 사장님이 새 비밀번호를 입력하고 [변경하기] 버튼을 누르면 `{api:owner_auth:confirm}`을 호출합니다. 토큰은 15분 유효, 1회만 사용 가능합니다."
         ],
         "ui_events": [
             ["[버튼] 회원가입", "POST /owner/auth/register", "가입 성공 토스트를 띄우고 사업자 인증 화면으로 즉시 이동시킵니다.", "백엔드에서 VALIDATION_ERROR가 오면 팝업 대신 입력칸 바로 아래에 빨간 텍스트로 에러 내용을 각각 표시해주세요."],
@@ -480,12 +480,12 @@ SCREEN_PLAYBOOKS = {
     },
     "2": {
         "api_sequence": [
-            "[초기 진입]: 샵 설정 화면에 들어오면 `GET /owner/shop`을 호출하여 샵 정보를 가져옵니다.",
-            "[초안 폼 렌더링]: 아직 샵 데이터가 404로 없으면 빈 입력 폼을 띄워주고, 폼 작성 후 저장할 때 `POST /owner/shop`으로 생성합니다.",
-            "[부분 수정 분리]: 샵 데이터가 이미 있다면, [기본 정보]는 `PATCH /owner/shop`, [영업시간]은 `PATCH /owner/shop/business-hours` 로 각각 나누어 저장 버튼과 API를 분리해주세요.",
-            "[정책 및 결제]: 마찬가지로 [예약 정책] 탭은 `PATCH /owner/shop/reservation-policy`, [결제 방식] 탭은 `PATCH /owner/shop/payment-method`로 저장 로직을 분리해 관리합니다.",
-            "[이미지 관리]: 대표 이미지(thumbnail_url)와 샵 갤러리 이미지(image_urls, 최대 10장)를 수정할 때는 `PATCH /owner/shop/images`를 호출합니다. 이미지 파일 자체는 먼저 `POST /uploads/presigned`로 업로드 URL을 받아 직접 올린 후, 반환된 URL을 이 API에 넘깁니다.",
-            "[공개 상태 토글]: 스위치를 눌러 공개/숨김을 바꿀 때는 `PATCH /owner/shop/visibility`를 호출합니다. 단, 아직 사업자 승인 전이라면 이 스위치를 회색으로 막아둬야 합니다."
+            "[초기 진입]: 샵 설정 화면에 들어오면 `{api:owner_shop:shop}`을 호출하여 샵 정보를 가져옵니다.",
+            "[초안 폼 렌더링]: 아직 샵 데이터가 404로 없으면 빈 입력 폼을 띄워주고, 폼 작성 후 저장할 때 `{api:owner_shop:shop}`으로 생성합니다.",
+            "[부분 수정 분리]: 샵 데이터가 이미 있다면, [기본 정보]는 `{api:owner_shop:shop}`, [영업시간]은 `{api:owner_shop:business-hours}` 로 각각 나누어 저장 버튼과 API를 분리해주세요.",
+            "[정책 및 결제]: 마찬가지로 [예약 정책] 탭은 `{api:owner_shop:reservation-policy}`, [결제 방식] 탭은 `{api:owner_shop:payment-method}`로 저장 로직을 분리해 관리합니다.",
+            "[이미지 관리]: 대표 이미지(thumbnail_url)와 샵 갤러리 이미지(image_urls, 최대 10장)를 수정할 때는 `{api:owner_shop:images}`를 호출합니다. 이미지 파일 자체는 먼저 `{api:uploads:presigned}`로 업로드 URL을 받아 직접 올린 후, 반환된 URL을 이 API에 넘깁니다.",
+            "[공개 상태 토글]: 스위치를 눌러 공개/숨김을 바꿀 때는 `{api:owner_shop:visibility}`를 호출합니다. 단, 아직 사업자 승인 전이라면 이 스위치를 회색으로 막아둬야 합니다."
         ],
         "ui_events": [
             ["[버튼] 샵 기본 정보 저장", "PATCH /owner/shop", "화면 하단에 '저장 완료' 토스트를 띄워주고, 입력된 값으로 화면 상태(Context/Store)를 즉시 갱신합니다.", "주소 누락, 전화번호 포맷 등의 에러는 팝업 대신 각 입력칸 하단에 빨간 안내 문구로 콕 집어 표시해주세요."],
@@ -507,11 +507,11 @@ SCREEN_PLAYBOOKS = {
     },
     "3": {
         "api_sequence": [
-            "[목록 진입]: 디자이너 관리 화면에 진입하면 `GET /owner/designers` API로 소속 디자이너 목록을 쭉 가져와 리스트업합니다.",
-            "[추가 및 상세]: 새 디자이너를 만들 때는 `POST /owner/designers`, 특정 디자이너 카드를 눌러 상세 화면에 들어갈 때는 `GET /owner/designers/{designer_id}`를 호출합니다.",
-            "[기본 정보 수정]: 이름, 프로필 이미지 등은 상세 화면 안에서 `PATCH /owner/designers/{designer_id}`로 즉시 저장합니다.",
-            "[스케줄 관리]: 고정된 주간 근무시간을 바꿀 때는 `PATCH /owner/designers/{id}/schedule`, 연차 등 임시 휴무일을 찍어줄 때는 `POST /owner/designers/{id}/time-off`를 호출합니다.",
-            "[비활성화/삭제]: 퇴사하거나 당분간 쉬는 디자이너는 `DELETE /owner/designers/{designer_id}`로 처리하고 프론트 목록을 갱신합니다."
+            "[목록 진입]: 디자이너 관리 화면에 진입하면 `{api:owner_designer:designers}` API로 소속 디자이너 목록을 쭉 가져와 리스트업합니다.",
+            "[추가 및 상세]: 새 디자이너를 만들 때는 `{api:owner_designer:designers}`, 특정 디자이너 카드를 눌러 상세 화면에 들어갈 때는 `{api:owner_designer:designers}`를 호출합니다.",
+            "[기본 정보 수정]: 이름, 프로필 이미지 등은 상세 화면 안에서 `{api:owner_designer:designers}`로 즉시 저장합니다.",
+            "[스케줄 관리]: 고정된 주간 근무시간을 바꿀 때는 `{api:owner_designer:schedule}`, 연차 등 임시 휴무일을 찍어줄 때는 `{api:owner_designer:time-off}`를 호출합니다.",
+            "[비활성화/삭제]: 퇴사하거나 당분간 쉬는 디자이너는 `{api:owner_designer:designers}`로 처리하고 프론트 목록을 갱신합니다."
         ],
         "ui_events": [
             ["[버튼] 새 디자이너 추가", "POST /owner/designers", "저장 후 목록 화면으로 돌아오면 방금 추가된 디자이너 카드가 목록 상단에 새롭게 보이도록 추가해줍니다.", "이름이나 직급 등 필수값이 비어있으면 폼 에러(인라인 붉은 글씨)를 표시합니다."],
@@ -532,12 +532,12 @@ SCREEN_PLAYBOOKS = {
     },
     "4": {
         "api_sequence": [
-            "[목록 진입]: 디자인(손톱 포트폴리오) 목록 화면 진입 시 `GET /owner/designs`를 호출합니다. 필터링을 위해 visibility와 ai_analysis_status 쿼리를 활용할 수 있습니다.",
-            "[신규 등록]: 디자인 폼에 이미지(1~5장)와 가격, 설명 등을 채우고 [저장]을 누르면 프론트에서 유효성 검사 후 `POST /owner/designs`를 쏩니다.",
-            "[상세 및 폴링]: 디자인 카드를 누르면 `GET /owner/designs/{design_id}`를 호출하여 가장 최신의 AI 분석 상태(status)와 결과값을 화면에 뿌려줍니다.",
-            "[수정 처리]: 제목이나 가격, 태그 등을 수정하고 저장할 때는 `PATCH /owner/designs/{design_id}`를 호출합니다.",
+            "[목록 진입]: 디자인(손톱 포트폴리오) 목록 화면 진입 시 `{api:owner_design:designs}`를 호출합니다. 필터링을 위해 visibility와 ai_analysis_status 쿼리를 활용할 수 있습니다.",
+            "[신규 등록]: 디자인 폼에 이미지(1~5장)와 가격, 설명 등을 채우고 [저장]을 누르면 프론트에서 유효성 검사 후 `{api:owner_design:designs}`를 쏩니다.",
+            "[상세 및 폴링]: 디자인 카드를 누르면 `{api:owner_design:designs}`를 호출하여 가장 최신의 AI 분석 상태(status)와 결과값을 화면에 뿌려줍니다.",
+            "[수정 처리]: 제목이나 가격, 태그 등을 수정하고 저장할 때는 `{api:owner_design:designs}`를 호출합니다.",
             "[사진 교체 시 주의]: 사진을 추가(`POST .../images`)하거나 지울(`DELETE .../images/{id}`) 경우, 백엔드에서 AI 분석 상태를 다시 pending으로 돌려버리므로 화면에서도 뱃지를 즉시 '분석 중 ⏳'으로 덮어씌워야 합니다.",
-            "[수동 재분석]: AI가 너무 이상하게 분석했거나 failed 떴을 때 누르는 재분석 버튼은 `POST /owner/designs/{design_id}/reanalyze`를 호출합니다."
+            "[수동 재분석]: AI가 너무 이상하게 분석했거나 failed 떴을 때 누르는 재분석 버튼은 `{api:owner_design:reanalyze}`를 호출합니다."
         ],
         "ui_events": [
             ["[버튼] 새 디자인 등록", "POST /owner/designs", "등록 성공 토스트와 함께 목록 맨 위로 올려주고, 상태 뱃지는 무조건 'AI 분석 중'으로 달아줍니다.", "가장 흔한 에러인 필수값 누락이나 이미지 0장 업로드 시도는 API를 쏘기 전에 프론트에서 막고 폼 에러를 띄워주세요."],
@@ -560,9 +560,9 @@ SCREEN_PLAYBOOKS = {
     "5": {
         "api_sequence": [
             "[예약 목록 진입]: 예약 캘린더나 리스트에 들어올 때 `GET /owner/reservations?from=날짜&to=날짜&status=상태` 쿼리를 잘 조합해서 호출해 화면을 그립니다.",
-            "[최신화 조회]: 특정 예약 카드를 눌러 팝업/모달 상세를 띄울 때는 방금 전 상태가 바뀌었을지 모르니 `GET /owner/reservations/{id}` 단건 조회를 한 번 더 날려 최신화합니다.",
-            "[사장님의 응답]: 새 요청(pending)에 대해 [수락] 버튼은 `POST /owner/reservations/{id}/accept`, [거절] 버튼은 `POST /owner/reservations/{id}/reject`를 쏩니다.",
-            "[계좌이체 확인]: 계좌이체 정책인 샵에서, 사장님이 유저의 입금 내역을 통장에서 직접 보고 누르는 [입금 확인 완료] 버튼은 `POST /owner/reservations/{id}/payment-confirmed`입니다.",
+            "[최신화 조회]: 특정 예약 카드를 눌러 팝업/모달 상세를 띄울 때는 방금 전 상태가 바뀌었을지 모르니 `{api:owner_reservation:reservations}` 단건 조회를 한 번 더 날려 최신화합니다.",
+            "[사장님의 응답]: 새 요청(pending)에 대해 [수락] 버튼은 `{api:owner_reservation:accept}`, [거절] 버튼은 `{api:owner_reservation:reject}`를 쏩니다.",
+            "[계좌이체 확인]: 계좌이체 정책인 샵에서, 사장님이 유저의 입금 내역을 통장에서 직접 보고 누르는 [입금 확인 완료] 버튼은 `{api:owner_reservation:payment-confirmed}`입니다.",
             "[시술 종료 후]: 유저가 시술을 받고 가면 `complete`, 안 나타나면 `no-show`, 예약이 취소되면 `cancel` API를 각각 날린 후 캘린더를 새로고침(refetch) 합니다."
         ],
         "ui_events": [
@@ -589,9 +589,9 @@ SCREEN_PLAYBOOKS = {
     },
     "6": {
         "api_sequence": [
-            "[리뷰 목록 진입]: 리뷰 화면에 처음 들어오면 `GET /owner/reviews`에 sort, unanswered, cursor 등의 필터 쿼리 파라미터를 말아서 호출합니다.",
+            "[리뷰 목록 진입]: 리뷰 화면에 처음 들어오면 `{api:review:reviews}`에 sort, unanswered, cursor 등의 필터 쿼리 파라미터를 말아서 호출합니다.",
             "[미답변 필터 연동]: 대시보드에서 '미답변 리뷰 3건' 카드를 콕 찍어서 넘어온 경우엔 프론트 라우터가 똑똑하게 `unanswered=true` 쿼리를 물고 들어오게 렌더링해야 합니다.",
-            "[답변 달기]: 사장님이 정성껏 쓴 답변을 저장할 때는 `POST /reviews/{id}/reply`, 오타를 고칠 때는 `PATCH /reviews/{id}/reply`, 지울 때는 `DELETE /reviews/{id}/reply`를 호출합니다.",
+            "[답변 달기]: 사장님이 정성껏 쓴 답변을 저장할 때는 `{api:review:reply}`, 오타를 고칠 때는 `{api:review:reply}`, 지울 때는 `{api:review:reply}`를 호출합니다.",
             "[상태 갱신]: 답변 관련 API(POST/PATCH/DELETE)를 쏘고 나면 해당 리뷰 카드 하나만 로컬 상태를 바꾸거나, 리스트 전체를 가볍게 refetch 해서 화면 싱크를 맞춥니다."
         ],
         "ui_events": [
@@ -614,8 +614,8 @@ SCREEN_PLAYBOOKS = {
     "7": {
         "api_sequence": [
             "[목록 진입]: 스네일 탭(커뮤니티)을 누르면 `GET /owner/snaps?cursor=` 무한 스크롤 API를 불러 우리 샵이 태그된 사진들만 구경합니다.",
-            "[상세 조회]: 썸네일을 눌러 팝업/페이지로 들어가면 `GET /snaps/{id}`로 본문과 최신 좋아요 수 등을 가져옵니다.",
-            "[댓글 로딩]: 상세 화면 하단에서 `GET /snaps/{id}/comments`를 불러와 유저들의 반응을 주욱 나열해줍니다.",
+            "[상세 조회]: 썸네일을 눌러 팝업/페이지로 들어가면 `{api:snap:snaps}`로 본문과 최신 좋아요 수 등을 가져옵니다.",
+            "[댓글 로딩]: 상세 화면 하단에서 `{api:comment_like_follow:comments}`를 불러와 유저들의 반응을 주욱 나열해줍니다.",
             "[샵 댓글 처리]: 사장님이 샵 이름으로 댓글을 달거나 고치거나 지울 때는 기존 유저용 댓글 API(POST/PATCH/DELETE comments)를 그대로 재사용해 날리면 됩니다."
         ],
         "ui_events": [
@@ -637,7 +637,7 @@ SCREEN_PLAYBOOKS = {
     },
     "8": {
         "api_sequence": [
-            "[대시보드 진입]: 홈 화면(대시보드)에 뜨면 복잡하게 여러 API 부를 것 없이 쿨하게 `GET /owner/dashboard/summary` 단일 API 하나만 쏴서 숫자 4개를 다 받아옵니다.",
+            "[대시보드 진입]: 홈 화면(대시보드)에 뜨면 복잡하게 여러 API 부를 것 없이 쿨하게 `{api:owner_dashboard:summary}` 단일 API 하나만 쏴서 숫자 4개를 다 받아옵니다.",
             "[카드 라우팅]: 사장님이 4개의 지표 카드 중 하나를 누르면, 프론트엔드 라우터(Router)가 해당 페이지 경로로 이동시키면서 필수적인 필터 조건(Query params)을 뒤에 꼬리표처럼 달아줍니다.",
             "[예시]: '새 예약 요청 3건' 카드를 눌렀다면 라우터는 `/reservations?status=pending` 경로로 푸시하고, '미답변 리뷰' 카드는 `/reviews?unanswered=true`로 쏴줍니다."
         ],
@@ -662,9 +662,9 @@ SCREEN_PLAYBOOKS = {
     "9": {
         "api_sequence": [
             "[알림 팝오버 열기]: 우측 상단 종모양을 눌러 알림함을 열 때 무한 스크롤용 `GET /owner/notifications?cursor=` API를 호출해서 리스트를 깔아줍니다.",
-            "[빨간 뱃지 갱신]: 화면 상단 종 아이콘 위 붉은 숫자 뱃지는 주기적으로 `GET /owner/notifications/unread-count`를 찔러서 안 읽은 갯수만 가볍게 그려냅니다.",
-            "[알림 클릭 이벤트]: 개별 알림을 톡 누르면 제일 먼저 `PATCH /owner/notifications/{id}/read`를 눈썹 휘날리게 쏴서 읽음 처리를 시킨 후, 알림 객체에 담겨있던 `deeplink_target` URL 주소로 사장님을 텔레포트 시켜줍니다.",
-            "[모두 읽음 빗자루질]: '모두 읽음' 텍스트 버튼을 누르면 `POST /owner/notifications/read-all` API를 쏘고, 성공하자마자 뱃지 숫자를 0으로 확 날려버립니다."
+            "[빨간 뱃지 갱신]: 화면 상단 종 아이콘 위 붉은 숫자 뱃지는 주기적으로 `{api:owner_notification:unread-count}`를 찔러서 안 읽은 갯수만 가볍게 그려냅니다.",
+            "[알림 클릭 이벤트]: 개별 알림을 톡 누르면 제일 먼저 `{api:owner_notification:read}`를 눈썹 휘날리게 쏴서 읽음 처리를 시킨 후, 알림 객체에 담겨있던 `deeplink_target` URL 주소로 사장님을 텔레포트 시켜줍니다.",
+            "[모두 읽음 빗자루질]: '모두 읽음' 텍스트 버튼을 누르면 `{api:owner_notification:read-all}` API를 쏘고, 성공하자마자 뱃지 숫자를 0으로 확 날려버립니다."
         ],
         "ui_events": [
             ["[리스트 클릭] 알림 항목 선택", "PATCH /owner/notifications/{id}/read API 직후 라우팅", "알림 백그라운드 색이 '안 읽음(푸르스름)'에서 '읽음(흰색)'으로 슥 바뀌고, 해당 예약/리뷰 상세 페이지로 바로 넘어갑니다.", "만약 deeplink_target이 빈 값이거나 갈 곳이 애매한 알림이라면 어디 안 넘어가고 그냥 읽음 처리 색깔만 바꿔주세요."],
@@ -828,6 +828,23 @@ def load_backend_data():
                         "source_file": rel,
                         "line": find_line(path, endpoint),
                     }
+            # common_api_rules.image_upload.api 특수 처리
+            upload_api = block.get("common_api_rules", {}).get("image_upload", {}).get("api")
+            if upload_api:
+                data["apis"].setdefault("uploads", {"items": {}, "source_file": rel})
+                for row in upload_api:
+                    if len(row) < 2:
+                        continue
+                    endpoint = row[0]
+                    purpose = row[1] if len(row) > 1 else ""
+                    params = row[2] if len(row) > 2 else ""
+                    data["apis"]["uploads"]["items"][endpoint] = {
+                        "endpoint": endpoint,
+                        "purpose": purpose,
+                        "params": params,
+                        "source_file": rel,
+                        "line": find_line(path, endpoint),
+                    }
     return data
 
 
@@ -876,10 +893,25 @@ def resolve_mapping(mapping, backend, front_sections):
     found = len(field_refs) + len(api_refs)
     coverage = 1.0 if total_expected == 0 else found / total_expected
 
-    return {
+    # 템플릿 참조 해석: {api:group:keyword} 등을 실제 값으로 치환
+    raw_guides = IMPLEMENTATION_GUIDES.get(mapping["id"], [])
+    raw_playbook = SCREEN_PLAYBOOKS.get(mapping["id"], {})
+
+    from spec_ref import resolve_refs_in_playbooks, resolve_refs_in_guides, resolve_all_refs
+    resolved_guides = resolve_refs_in_guides({mapping["id"]: raw_guides}, backend)[mapping["id"]]
+    resolved_playbook_map = resolve_refs_in_playbooks({mapping["id"]: raw_playbook}, backend)
+    resolved_playbook = resolved_playbook_map[mapping["id"]]
+
+    # checkpoints 등 mapping 내 텍스트 필드도 해석
+    resolved_checkpoints = []
+    for cp in mapping.get("checkpoints", []):
+        resolved_checkpoints.append(resolve_all_refs(cp, backend))
+
+    result = {
         **mapping,
-        "implementation_guides": IMPLEMENTATION_GUIDES.get(mapping["id"], []),
-        "playbook": SCREEN_PLAYBOOKS.get(mapping["id"], {}),
+        "checkpoints": resolved_checkpoints,
+        "implementation_guides": resolved_guides,
+        "playbook": resolved_playbook,
         "front_refs": resolved_sections,
         "field_refs": field_refs,
         "api_refs": api_refs,
@@ -888,6 +920,7 @@ def resolve_mapping(mapping, backend, front_sections):
         "coverage": round(coverage, 3),
         "status": "needs_attention" if missing_refs or missing_front_sections or coverage < 1 else "connected",
     }
+    return result
 
 
 def clip_text(value, limit=160):
