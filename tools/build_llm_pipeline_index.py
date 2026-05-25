@@ -19,6 +19,8 @@ DOCS_DIR = ROOT / "docs"
 INDEX_JSON_PATH = OUTPUT_DIR / "llm_pipeline_backend_index.json"
 INDEX_HTML_PATH = OUTPUT_DIR / "llm_pipeline_backend_index.html"
 SHARED_HTML_PATH = DOCS_DIR / "llm_pipeline_backend_index.html"
+AI_TEXT_PATH = OUTPUT_DIR / "llm_pipeline_backend_index.ai.txt"
+SHARED_AI_TEXT_PATH = DOCS_DIR / "llm_pipeline_backend_index.ai.txt"
 
 
 EASY_FIELD_EXPLANATIONS = {
@@ -453,6 +455,81 @@ def flatten_backend(backend):
     return fields, apis
 
 
+def clip_text(value, limit=160):
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "..."
+
+
+def build_ai_brief(index):
+    llm_spec = index["llm_spec"]
+    lines = [
+        "# AI 작업용 요약: LLM 파이프라인 ↔ 백엔드",
+        "",
+        "이 텍스트는 HTML 전체를 AI 코딩 도구에 붙여넣는 대신 사용할 압축 컨텍스트입니다.",
+        "목표: LLM Transform/Classify 작업자와 백엔드 담당자가 같은 입출력 계약, 저장 필드, 실패 처리 규칙을 기준으로 구현하게 합니다.",
+        "",
+        "전체 흐름:",
+        "1. 사장님이 디자인 원본 이미지를 업로드합니다.",
+        "2. 백엔드는 원본 이미지를 저장하고 LLM Transform을 요청합니다.",
+        "3. Transform은 손톱 영역을 잘라 cropped 이미지를 만듭니다.",
+        "4. 백엔드는 cropped 이미지로 Classify를 요청합니다.",
+        "5. Classify는 표준 태그/색상/스타일을 반환합니다.",
+        "6. 백엔드는 결과를 Design/DesignImage 필드에 저장하고, 조건 충족 시 고객에게 노출합니다.",
+        "",
+        "공통 원칙:",
+        "- image_id는 백엔드 DesignImage.image_id와 LLM 결과를 맞추는 키입니다.",
+        "- status는 success 또는 failed를 사용합니다. failed이면 error_code를 반드시 보냅니다.",
+        "- Classify의 tags/color/style은 표준 태그 사전 값만 반환합니다.",
+        "- 10초 이상 걸리면 동기 응답보다 callback/webhook 구조를 권장합니다.",
+        "- 이미지 저장 주체, callback 인증, confidence 실패 기준은 구현 전 합의해야 합니다.",
+        "",
+        "단계별 구현 컨텍스트:",
+    ]
+
+    for step in index["steps"]:
+        lines.extend(["", f"## {step['title']}", f"요약: {step['summary']}"])
+        if step.get("plain_language"):
+            lines.append("쉽게 말하면:")
+            lines.extend(f"- {row}" for row in step["plain_language"])
+        if step.get("guide"):
+            lines.append("구현 가이드:")
+            lines.extend(f"- {row}" for row in step["guide"])
+        if step.get("checkpoints"):
+            lines.append("체크포인트:")
+            lines.extend(f"- {row}" for row in step["checkpoints"])
+        if step.get("contract"):
+            contract = step["contract"]
+            lines.append(f"Endpoint: {contract['endpoint']}")
+            lines.append("Request fields:")
+            lines.extend(f"- {field['name']}: {field.get('meaning') or '-'}" for field in contract["request_fields"])
+            lines.append("Response fields:")
+            lines.extend(f"- {field['name']}: {field.get('meaning') or '-'}" for field in contract["response_fields"])
+        if step.get("field_refs"):
+            field_names = ", ".join(f"{ref['entity']}.{ref['name']}" for ref in step["field_refs"])
+            lines.append(f"관련 백엔드 필드: {field_names}")
+        if step.get("api_refs"):
+            lines.append("관련 백엔드 API:")
+            lines.extend(
+                f"- {ref['endpoint']}: {clip_text(ref.get('easy_purpose') or ref.get('purpose'), 120)}"
+                for ref in step["api_refs"]
+            )
+
+    lines.extend(["", "에러 코드:"])
+    for code, meaning, owner_message in llm_spec.get("error_codes", []):
+        lines.append(f"- {code}: {meaning} / 사장님 안내: {owner_message}")
+
+    lines.extend(["", "표준 태그 사전:"])
+    for key, values in llm_spec.get("standard_tags", {}).items():
+        lines.append(f"- {key}: {', '.join(values)}")
+
+    lines.extend(["", "논의 필요 질문:"])
+    lines.extend(f"- {row}" for row in llm_spec.get("worker_questions", []))
+
+    return "\n".join(lines).strip() + "\n"
+
+
 def build_index():
     if not LLM_GUIDE_PATH.exists():
         raise FileNotFoundError(f"LLM 연동 가이드를 찾을 수 없습니다: {LLM_GUIDE_PATH}")
@@ -468,7 +545,7 @@ def build_index():
         contract = llm_spec.get(key, {})
         contract_field_count += len(contract.get("request_fields", [])) + len(contract.get("response_fields", []))
 
-    return {
+    index = {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "source": {
             "llm_guide": LLM_GUIDE_PATH.relative_to(ROOT).as_posix(),
@@ -490,6 +567,8 @@ def build_index():
             "apis": all_apis,
         },
     }
+    index["ai_brief"] = build_ai_brief(index)
+    return index
 
 
 HTML_TEMPLATE = """<!doctype html>
@@ -557,6 +636,18 @@ HTML_TEMPLATE = """<!doctype html>
     .content { padding: 18px 22px 36px; overflow: auto; }
     .meta { color: var(--muted); font-size: 12px; line-height: 1.45; }
     .stats { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .header-right {
+      display: grid;
+      gap: 8px;
+      justify-items: end;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
     .stat {
       min-width: 92px;
       border: 1px solid var(--line);
@@ -595,6 +686,21 @@ HTML_TEMPLATE = """<!doctype html>
     }
     button:hover { border-color: var(--accent); }
     button.active { border-color: var(--accent); background: var(--accent-weak); }
+    .copy-btn {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+    }
+    .copy-btn:hover { filter: brightness(0.96); }
+    .text-link {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: var(--text);
+      font-size: 13px;
+    }
     .step-list { display: grid; gap: 8px; }
     .step-title { font-weight: 700; margin-bottom: 5px; }
     .step-summary { color: var(--muted); font-size: 12px; line-height: 1.45; }
@@ -694,6 +800,8 @@ HTML_TEMPLATE = """<!doctype html>
     @media (max-width: 980px) {
       header { display: block; }
       .stats { justify-content: flex-start; margin-top: 12px; }
+      .header-right { justify-items: start; margin-top: 12px; }
+      .actions { justify-content: flex-start; }
       main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
       .grid { grid-template-columns: 1fr; }
@@ -707,7 +815,14 @@ HTML_TEMPLATE = """<!doctype html>
       <h1>LLM 파이프라인 ↔ 백엔드 명세 인덱스</h1>
       <div class="meta" id="generatedMeta"></div>
     </div>
-    <div class="stats" id="stats"></div>
+    <div class="header-right">
+      <div class="stats" id="stats"></div>
+      <div class="actions">
+        <button class="copy-btn" id="copyAiBriefBtn" type="button">AI 요약 복사</button>
+        <a class="text-link" href="llm_pipeline_backend_index.ai.txt">AI용 TXT 열기</a>
+        <span class="meta" id="copyAiBriefStatus"></span>
+      </div>
+    </div>
   </header>
   <main>
     <aside>
@@ -937,8 +1052,29 @@ HTML_TEMPLATE = """<!doctype html>
         : `<div class="meta">검색어를 입력하면 필드/API가 표시됩니다.</div>`;
     }
 
+    async function copyAiBrief() {
+      const status = document.getElementById("copyAiBriefStatus");
+      try {
+        await navigator.clipboard.writeText(data.ai_brief || "");
+        status.textContent = "복사됨";
+      } catch (error) {
+        const textarea = document.createElement("textarea");
+        textarea.value = data.ai_brief || "";
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        status.textContent = "복사됨";
+      }
+      window.setTimeout(() => { status.textContent = ""; }, 1800);
+    }
+
     document.getElementById("filterInput").addEventListener("input", renderList);
     document.getElementById("globalSearch").addEventListener("input", renderGlobalResults);
+    document.getElementById("copyAiBriefBtn").addEventListener("click", copyAiBrief);
     renderStats();
     renderList();
     renderDetail();
@@ -953,6 +1089,8 @@ def write_outputs(index):
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     INDEX_JSON_PATH.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+    AI_TEXT_PATH.write_text(index["ai_brief"], encoding="utf-8")
+    SHARED_AI_TEXT_PATH.write_text(index["ai_brief"], encoding="utf-8")
     json_for_html = json.dumps(index, ensure_ascii=False).replace("</", "<\\/")
     html = HTML_TEMPLATE.replace("__INDEX_DATA__", json_for_html)
     INDEX_HTML_PATH.write_text(html, encoding="utf-8")
@@ -965,6 +1103,8 @@ def main():
     print(f"saved: {INDEX_JSON_PATH}")
     print(f"saved: {INDEX_HTML_PATH}")
     print(f"saved: {SHARED_HTML_PATH}")
+    print(f"saved: {AI_TEXT_PATH}")
+    print(f"saved: {SHARED_AI_TEXT_PATH}")
     print(f"sections: {index['stats']['pipeline_sections']}")
     print(f"contract_fields: {index['stats']['contract_fields']}")
     print(f"error_codes: {index['stats']['error_codes']}")

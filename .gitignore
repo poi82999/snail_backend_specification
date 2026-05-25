@@ -4,4 +4,5 @@ outputs/*.xlsx
 outputs/*.html
 outputs/*.json
 outputs/*.png
+outputs/*.txt
 ~$*.xlsx

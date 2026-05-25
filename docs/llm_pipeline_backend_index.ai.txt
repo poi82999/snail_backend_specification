@@ -1,0 +1,199 @@
+# AI 작업용 요약: LLM 파이프라인 ↔ 백엔드
+
+이 텍스트는 HTML 전체를 AI 코딩 도구에 붙여넣는 대신 사용할 압축 컨텍스트입니다.
+목표: LLM Transform/Classify 작업자와 백엔드 담당자가 같은 입출력 계약, 저장 필드, 실패 처리 규칙을 기준으로 구현하게 합니다.
+
+전체 흐름:
+1. 사장님이 디자인 원본 이미지를 업로드합니다.
+2. 백엔드는 원본 이미지를 저장하고 LLM Transform을 요청합니다.
+3. Transform은 손톱 영역을 잘라 cropped 이미지를 만듭니다.
+4. 백엔드는 cropped 이미지로 Classify를 요청합니다.
+5. Classify는 표준 태그/색상/스타일을 반환합니다.
+6. 백엔드는 결과를 Design/DesignImage 필드에 저장하고, 조건 충족 시 고객에게 노출합니다.
+
+공통 원칙:
+- image_id는 백엔드 DesignImage.image_id와 LLM 결과를 맞추는 키입니다.
+- status는 success 또는 failed를 사용합니다. failed이면 error_code를 반드시 보냅니다.
+- Classify의 tags/color/style은 표준 태그 사전 값만 반환합니다.
+- 10초 이상 걸리면 동기 응답보다 callback/webhook 구조를 권장합니다.
+- 이미지 저장 주체, callback 인증, confidence 실패 기준은 구현 전 합의해야 합니다.
+
+단계별 구현 컨텍스트:
+
+## 전체 처리 흐름
+요약: 사장님 디자인 이미지 업로드부터 LLM 분석 완료 후 유저 노출까지의 비동기 연결 흐름.
+쉽게 말하면:
+- 사장님이 디자인 사진을 올리면 백엔드는 먼저 저장만 하고 화면에 빠르게 응답합니다.
+- 그 뒤 백엔드가 LLM에게 사진 분석을 맡기고, LLM 결과가 돌아오면 디자인의 검색 태그와 노출 가능 상태를 업데이트합니다.
+- 즉, 사장님이 등록 버튼을 누르는 일과 AI 분석이 끝나는 일은 같은 순간에 일어나지 않습니다.
+구현 가이드:
+- 백엔드는 사장님 등록 요청에 즉시 응답하고, LLM 작업은 별도 큐에서 처리한다.
+- 사용자 노출은 `owner approved + shop active + design active + ai_analysis_status=done`이 모두 충족된 뒤 가능하다.
+- 이미지 변경 또는 재분석 요청은 `ai_analysis_status=pending`으로 되돌리고 Transform부터 다시 태운다.
+체크포인트:
+- LLM 처리 시간이 10초 이상이면 동기 응답 대신 callback/webhook 구조로 고정한다.
+- 사장님 화면의 분석 중 상태는 pending/in_progress를 하나로 묶어 보여준다.
+- 원본 이미지는 재처리와 감사 추적을 위해 보관한다.
+관련 백엔드 필드: Design.visibility, Design.ai_analysis_status, Design.ai_analysis_started_at, Design.ai_analysis_completed_at, DesignImage.original_url, DesignImage.cropped_url, DesignImage.ai_transform_status, DesignImage.ai_classify_status
+관련 백엔드 API:
+- POST /owner/designs: 사장님이 새 디자인을 등록하는 버튼과 연결됩니다. 화면은 바로 등록 완료로 넘어가고, AI 분석은 뒤에서 따로 진행됩니다.
+- GET /owner/designs/{design_id}: 디자인 하나의 상세 정보와 AI 분석 상태를 확인할 때 사용합니다.
+- POST /owner/designs/{design_id}/images: 기존 디자인에 사진을 추가할 때 사용합니다. 사진이 바뀌면 AI 분석도 다시 시작됩니다.
+- POST /owner/designs/{design_id}/reanalyze: 분석이 실패했거나 다시 분석하고 싶을 때 누르는 '재분석' 버튼과 연결됩니다.
+
+## 1단계 Transform 계약
+요약: 원본 이미지에서 네일 영역을 추출하고 규격화된 cropped 이미지를 반환하는 계약.
+쉽게 말하면:
+- Transform은 원본 사진에서 손톱 부분만 보기 좋게 잘라내는 단계입니다.
+- 이 단계가 성공해야 다음 Classify 단계에서 색상과 스타일을 안정적으로 판단할 수 있습니다.
+- 실패하면 태그 분석으로 넘어가지 않고, 사장님에게 사진을 다시 올리거나 재분석하라는 동선을 보여줘야 합니다.
+구현 가이드:
+- `image_id`는 백엔드의 `DesignImage.image_id`와 1:1로 맞춘다.
+- `image_url`은 백엔드가 보관한 원본 이미지 URL이며, LLM은 이 URL에서 원본을 내려받아 처리한다.
+- 성공 시 `cropped_image_url`을 `DesignImage.cropped_url`에 저장하고 `ai_transform_status=done`으로 변경한다.
+체크포인트:
+- `cropped_image_url`의 저장 주체와 URL 만료 정책을 먼저 확정해야 한다.
+- Transform 실패는 Classify로 넘기지 않고 해당 이미지 또는 디자인 분석 상태를 failed로 종료한다.
+- confidence 기준값이 낮으면 재촬영 요구 또는 수동 검수로 보내는 정책이 필요하다.
+Endpoint: /v1/transform
+Request fields:
+- image_url: LLM이 내려받아 분석할 이미지 파일 주소입니다.
+- image_id: 백엔드와 LLM이 같은 이미지를 가리키기 위해 쓰는 고유 번호입니다.
+- callback_url: LLM 작업이 끝났을 때 결과를 되돌려줄 백엔드 주소입니다.
+- options.output_size: 잘라낸 이미지의 목표 크기입니다. 예: 1080x1080.
+- options.background: 잘라낸 이미지의 배경 처리 방식입니다. 예: 투명 배경.
+Response fields:
+- image_id: 백엔드와 LLM이 같은 이미지를 가리키기 위해 쓰는 고유 번호입니다.
+- status: 작업 성공 여부입니다. success면 성공, failed면 실패입니다.
+- cropped_image_url: Transform 결과로 만들어진 손톱 영역 이미지 주소입니다.
+- cropped_image_size: Transform 결과 이미지의 실제 크기입니다.
+- confidence: Transform 결과를 모델이 얼마나 확신하는지 나타내는 점수입니다.
+- nail_count_detected: 사진에서 감지한 손톱 개수입니다.
+- processing_time_ms: LLM 작업에 걸린 시간입니다. 밀리초 단위입니다.
+- error_code: 실패했을 때 실패 이유를 기계가 읽을 수 있게 정한 코드입니다.
+- error_message: 실패했을 때 사람이 읽을 수 있는 상세 설명입니다.
+관련 백엔드 필드: Design.ai_analysis_status, DesignImage.image_id, DesignImage.original_url, DesignImage.cropped_url, DesignImage.ai_transform_status
+관련 백엔드 API:
+- POST /owner/designs: 사장님이 새 디자인을 등록하는 버튼과 연결됩니다. 화면은 바로 등록 완료로 넘어가고, AI 분석은 뒤에서 따로 진행됩니다.
+- POST /owner/designs/{design_id}/images: 기존 디자인에 사진을 추가할 때 사용합니다. 사진이 바뀌면 AI 분석도 다시 시작됩니다.
+- POST /owner/designs/{design_id}/reanalyze: 분석이 실패했거나 다시 분석하고 싶을 때 누르는 '재분석' 버튼과 연결됩니다.
+
+## 2단계 Classify 계약
+요약: cropped 이미지를 분석해 검색/필터에 쓰는 태그, 색상, 스타일, 손톱 모양을 반환하는 계약.
+쉽게 말하면:
+- Classify는 잘라낸 손톱 이미지를 보고 검색에 필요한 태그와 색상을 붙이는 단계입니다.
+- LLM이 아무 단어나 만들면 검색 필터와 맞지 않으므로, 정해진 표준 태그 사전 안에서만 골라야 합니다.
+- 이 결과가 고객이 '핑크', '프렌치', '봄' 같은 조건으로 검색할 때 사용됩니다.
+구현 가이드:
+- LLM이 반환하는 `tags`는 백엔드의 `Design.ai_tags`로 저장한다.
+- `color_palette`는 `Design.ai_color_palette`, `style_category`는 `Design.ai_style_category`로 저장한다.
+- Classify 결과는 표준 태그 사전 값만 사용해야 검색 누락을 피할 수 있다.
+체크포인트:
+- 디자인 이미지가 여러 장일 때 이미지별 결과를 어떻게 병합할지 정책이 필요하다.
+- `confidence_overall` 기준 미만일 때 failed 처리할지, 낮은 신뢰도 태그만 제외할지 정해야 한다.
+- 모델 버전이 바뀌면 기존 디자인 재분석 필요 여부를 결정해야 한다.
+Endpoint: /v1/classify
+Request fields:
+- image_url: LLM이 내려받아 분석할 이미지 파일 주소입니다.
+- image_id: 백엔드와 LLM이 같은 이미지를 가리키기 위해 쓰는 고유 번호입니다.
+- locale: 결과 언어와 지역 기준입니다. 한국 서비스는 ko_KR을 사용합니다.
+- options.max_tags: LLM이 최대 몇 개의 태그를 돌려줄지 정합니다.
+- options.include_color_palette: 대표 색상도 함께 받을지 정합니다.
+- options.include_style_category: 큰 스타일 분류도 함께 받을지 정합니다.
+Response fields:
+- image_id: 백엔드와 LLM이 같은 이미지를 가리키기 위해 쓰는 고유 번호입니다.
+- status: 작업 성공 여부입니다. success면 성공, failed면 실패입니다.
+- tags: 검색에 사용할 디자인 태그 목록입니다. 반드시 표준 태그 사전 안의 값이어야 합니다.
+- color_palette: 디자인의 대표 색상 목록입니다.
+- style_category: 디자인의 큰 스타일 분류입니다.
+- nail_shape: 손톱 모양입니다. 현재 백엔드 저장 필드 추가 여부는 별도 결정이 필요합니다.
+- confidence_overall: Classify 결과 전체를 모델이 얼마나 확신하는지 나타내는 점수입니다.
+- processing_time_ms: LLM 작업에 걸린 시간입니다. 밀리초 단위입니다.
+관련 백엔드 필드: Design.ai_tags, Design.ai_color_palette, Design.ai_style_category, Design.ai_analysis_status, DesignImage.image_id, DesignImage.cropped_url, DesignImage.ai_classify_status
+관련 백엔드 API:
+- GET /owner/designs/{design_id}: 디자인 하나의 상세 정보와 AI 분석 상태를 확인할 때 사용합니다.
+- POST /owner/designs/{design_id}/reanalyze: 분석이 실패했거나 다시 분석하고 싶을 때 누르는 '재분석' 버튼과 연결됩니다.
+
+## 에러 처리와 사장님 안내
+요약: LLM 실패 응답을 백엔드 상태와 사장님 화면 안내 문구로 연결하는 규칙.
+쉽게 말하면:
+- LLM 실패는 단순 서버 오류뿐 아니라 사진 품질 문제일 수도 있습니다.
+- 백엔드는 실패 코드를 보고 사장님에게 '다시 촬영', '재분석', '잠시 후 재시도' 중 어떤 안내를 보여줄지 결정합니다.
+- 같은 failed라도 원인별로 다음 행동이 달라야 화면이 친절해집니다.
+구현 가이드:
+- `status=failed`와 `error_code`를 기준으로 DB 상태와 사장님 화면 문구를 분기한다.
+- 최종 실패 후에는 사장님 화면에서 재분석 버튼 또는 사진 교체 동선을 제공한다.
+- 재시도 가능한 내부 오류와 재촬영이 필요한 품질 오류는 분리해서 다룬다.
+체크포인트:
+- `INTERNAL_ERROR`는 자동 재시도 대상이 될 수 있지만 `NO_NAIL`, `INAPPROPRIATE`는 재시도보다 사용자 조치가 우선이다.
+- 실패 알림을 보낼지, 사장님 디자인 목록에서만 표시할지 제품 정책을 확정한다.
+관련 백엔드 필드: Design.ai_analysis_status, Design.ai_analysis_completed_at, DesignImage.ai_transform_status, DesignImage.ai_classify_status
+관련 백엔드 API:
+- GET /owner/designs: 사장님이 내 디자인 목록을 볼 때 사용합니다. 분석 중, 분석 실패, 숨김 같은 탭을 만들 때 필요합니다.
+- GET /owner/designs/{design_id}: 디자인 하나의 상세 정보와 AI 분석 상태를 확인할 때 사용합니다.
+- POST /owner/designs/{design_id}/reanalyze: 분석이 실패했거나 다시 분석하고 싶을 때 누르는 '재분석' 버튼과 연결됩니다.
+
+## 표준 태그 사전
+요약: Classify 결과가 반드시 따라야 하는 enum/태그 사전과 백엔드 저장 필드.
+쉽게 말하면:
+- 표준 태그 사전은 LLM이 사용할 수 있는 단어 목록입니다.
+- 이 목록 밖의 단어가 들어오면 고객 검색과 필터에서 빠질 수 있습니다.
+- 태그를 추가하거나 이름을 바꾸면 LLM, 백엔드 검색, 프론트 필터를 함께 업데이트해야 합니다.
+구현 가이드:
+- `owner_tags`는 사장님 자유 입력, `ai_tags`는 LLM 표준 사전 기반 자동 태그로 분리한다.
+- LLM이 사전에 없는 단어를 보내면 DB 검색/필터에서 누락될 수 있으므로 백엔드 검증이 필요하다.
+- 태그 사전 변경은 프론트 필터, 검색 인덱스, 모델 프롬프트를 같이 업데이트한다.
+체크포인트:
+- `nail_shape`는 현재 `Design` 저장 필드에 명시되어 있지 않다. 저장이 필요하면 필드를 추가하거나 표시 제외 정책을 정해야 한다.
+- Classify output의 `tags`는 style/technique/mood/occasion을 하나의 배열로 합치는 구조다.
+관련 백엔드 필드: Design.owner_tags, Design.ai_tags, Design.ai_color_palette, Design.ai_style_category
+관련 백엔드 API:
+- POST /owner/designs: 사장님이 새 디자인을 등록하는 버튼과 연결됩니다. 화면은 바로 등록 완료로 넘어가고, AI 분석은 뒤에서 따로 진행됩니다.
+- PATCH /owner/designs/{design_id}: 디자인 제목, 가격, 소요 시간, 태그 같은 정보를 수정할 때 사용합니다.
+
+## 결정 필요 항목
+요약: LLM 작업 시작 전에 백엔드와 맞춰야 하는 운영 계약.
+쉽게 말하면:
+- 이 항목들은 코드를 짜기 전에 팀끼리 먼저 정해야 하는 운영 규칙입니다.
+- 예를 들어 LLM 결과를 바로 받을지, 나중에 callback으로 받을지에 따라 백엔드 구조가 달라집니다.
+- 이미지 저장 주체와 신뢰도 기준도 나중에 바꾸기 어려우므로 초기에 합의해야 합니다.
+구현 가이드:
+- 동기/비동기, callback 인증, 이미지 저장 주체, confidence 기준값은 API 구현 전에 확정한다.
+- LLM callback을 시스템 actor로 볼 경우 인증 방식과 재시도 중복 처리 idempotency가 필요하다.
+- 운영 중 모델이 업데이트될 때 `model_version`을 응답에 포함하면 재분석 판단이 쉬워진다.
+체크포인트:
+- callback을 쓴다면 동일 `image_id` 결과가 중복 도착해도 DB가 깨지지 않아야 한다.
+- LLM이 제공한 임시 URL 만료 전에 백엔드가 이미지를 소유 스토리지로 옮기는지 결정한다.
+관련 백엔드 필드: Design.ai_analysis_status, DesignImage.original_url, DesignImage.cropped_url
+
+에러 코드:
+- NO_NAIL: 사진에서 네일이 감지되지 않음 / 사장님 안내: 사진에서 네일을 찾지 못했어요. 손이 잘 보이는 사진으로 다시 올려주세요.
+- LOW_QUALITY: 해상도 낮음/블러/조명 부족 / 사장님 안내: 사진 화질이 낮아요. 좀 더 선명한 사진으로 시도해주세요.
+- MULTIPLE_HANDS: 여러 명의 손이 섞임 / 사장님 안내: 한 사람의 손만 나오는 사진으로 올려주세요.
+- OBSTRUCTED: 네일이 가려짐 / 사장님 안내: 네일이 잘 보이도록 다시 촬영해주세요.
+- INAPPROPRIATE: 부적절 콘텐츠 감지 / 사장님 안내: 이 사진은 업로드할 수 없습니다.
+- INTERNAL_ERROR: LLM 내부 에러 / 사장님 안내: 잠시 후 다시 시도해주세요.
+
+표준 태그 사전:
+- style: 프렌치, 옴브레, 그라데이션, 마그넷, 글리터, 큐빅, 라인아트, 캐릭터, 무광, 유광
+- color: 핑크, 레드, 누드, 블랙, 화이트, 베이지, 블루, 그린, 옐로우, 퍼플, 브라운, 골드, 실버
+- mood: 봄, 여름, 가을, 겨울, 시크, 러블리, 심플, 글래머, 내추럴, 키치, 모던
+- technique: 젤, 매니큐어, 페디큐어, 연장, 케어, 제거
+- shape: 스퀘어, 라운드, 오벌, 아몬드, 스틸레토, 발레리나
+- style_category: simple, glamour, classic, trendy, chic
+- occasion: 웨딩, 데일리, 파티, 오피스, 데이트
+
+논의 필요 질문:
+- Transform/Classify는 동기 응답인가, 비동기 callback인가
+- 비동기라면 callback URL 호출 시 인증 방식은 무엇인가
+- 평균 처리 시간과 p95 처리 시간은 어느 정도인가
+- 백엔드 timeout은 몇 초로 잡아야 하는가
+- 재시도 가능한 에러와 재시도하면 안 되는 에러는 무엇인가
+- rate limit 초과 시 어떤 HTTP status와 body를 반환하는가
+- cropped 이미지는 LLM이 저장하는가, 백엔드 S3에 업로드하는가
+- LLM이 제공하는 이미지 URL의 만료 시간은 얼마인가
+- 응답에 model_version을 포함할 수 있는가
+- 모델이 업데이트되면 기존 이미지를 재분석해야 하는가
+- 디자인에 이미지가 여러 장일 때 태그 병합은 LLM이 하는가, 백엔드가 하는가
+- 태그는 표준 태그 사전 값만 반환할 수 있는가
+- confidence가 낮을 때 백엔드가 실패로 처리해야 하는 기준값은 얼마인가

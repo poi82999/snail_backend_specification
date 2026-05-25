@@ -13,6 +13,8 @@ DOCS_DIR = ROOT / "docs"
 INDEX_JSON_PATH = OUTPUT_DIR / "owner_webapp_backend_index.json"
 INDEX_HTML_PATH = OUTPUT_DIR / "owner_webapp_backend_index.html"
 SHARED_HTML_PATH = DOCS_DIR / "owner_webapp_backend_index.html"
+AI_TEXT_PATH = OUTPUT_DIR / "owner_webapp_backend_index.ai.txt"
+SHARED_AI_TEXT_PATH = DOCS_DIR / "owner_webapp_backend_index.ai.txt"
 
 
 OWNER_SECTION_MAP = [
@@ -618,6 +620,74 @@ def resolve_mapping(mapping, backend, front_sections):
     }
 
 
+def clip_text(value, limit=160):
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "..."
+
+
+def build_ai_brief(index):
+    lines = [
+        "# AI 작업용 요약: 사장님 웹앱 ↔ 백엔드",
+        "",
+        "이 텍스트는 HTML 전체를 AI 코딩 도구에 붙여넣는 대신 사용할 압축 컨텍스트입니다.",
+        "목표: 사장님 웹앱 프론트 구현자가 백엔드 API/필드/상태 규칙을 빠르게 이해하고, 없는 API나 임의 필드를 만들지 않게 합니다.",
+        "",
+        "공통 원칙:",
+        "- 백엔드 원본은 spec_text/*.md이고, 이 요약은 그 원본을 화면 구현 관점으로 압축한 것입니다.",
+        "- API endpoint와 필드명은 아래 목록을 우선 사용합니다. 목록에 없는 값이 필요하면 백엔드 담당자에게 확인합니다.",
+        "- 에러 처리는 UNAUTHORIZED, FORBIDDEN, VERIFICATION_REQUIRED, VALIDATION_ERROR, CONFLICT, RATE_LIMITED를 화면에서 구분합니다.",
+        "- 사장님 사업자 인증 전에는 초안 작성은 허용하지만 공개 전환과 예약 운영 처리는 막습니다.",
+        "- 날짜/시간은 서버 UTC 저장, 화면은 샵 로컬 시간대로 표시합니다.",
+        "- 리스트는 cursor 기반 페이지네이션을 기본으로 가정합니다.",
+        "",
+        "핵심 상태 규칙:",
+        "- MVP는 1사장님=1샵 단수 구조입니다. 사장님 웹에서는 /owner/shop, /owner/designs, /owner/designers 계열을 우선 사용합니다.",
+        "- pending 예약은 슬롯을 완전히 잠그는 상태가 아닙니다. 사장님 수락 시점에 충돌을 다시 확인합니다.",
+        "- 계좌이체 예약은 pending -> payment_pending -> confirmed 흐름입니다. 유저의 [입금 완료]만으로 확정되지 않고 사장님 [입금 확인됨]이 필요합니다.",
+        "- 디자인 이미지는 1~5장입니다. 이미지 변경 시 AI 분석을 다시 시작합니다.",
+        "- 사용자 노출 조건은 owner 승인 + shop active + design active + ai_analysis_status=done 조합입니다.",
+        "",
+        "기능별 구현 컨텍스트:",
+    ]
+
+    for item in index["mappings"]:
+        lines.extend(
+            [
+                "",
+                f"## {item['id']}. {item['title']}",
+                f"요약: {item['summary']}",
+            ]
+        )
+        if item.get("implementation_guides"):
+            lines.append("구현 가이드:")
+            lines.extend(f"- {guide}" for guide in item["implementation_guides"])
+        if item.get("checkpoints"):
+            lines.append("체크포인트:")
+            lines.extend(f"- {checkpoint}" for checkpoint in item["checkpoints"])
+        if item.get("field_refs"):
+            field_names = ", ".join(f"{ref['entity']}.{ref['name']}" for ref in item["field_refs"])
+            lines.append(f"관련 필드: {field_names}")
+        if item.get("api_refs"):
+            lines.append("관련 API:")
+            lines.extend(
+                f"- {ref['endpoint']} : {clip_text(ref.get('purpose'), 120)}"
+                for ref in item["api_refs"]
+            )
+
+    lines.extend(
+        [
+            "",
+            "프론트 구현 요청 방식:",
+            "- 화면 진입 시 호출 API, 버튼 클릭 시 호출 API, 성공 후 화면 변화, 실패 시 문구를 먼저 정리한 뒤 구현합니다.",
+            "- 프론트에서 복잡한 상태 조합을 새로 만들지 말고 백엔드 상태값과 available action 규칙을 확인합니다.",
+            "- 이미지 업로드, 예약 상태 변경, 결제 확인, AI 분석 상태는 특히 임의 구현을 피합니다.",
+        ]
+    )
+    return "\n".join(lines).strip() + "\n"
+
+
 def build_index():
     if not FRONT_SPEC_PATH.exists():
         raise FileNotFoundError(f"프론트 명세서를 찾을 수 없습니다: {FRONT_SPEC_PATH}")
@@ -635,7 +705,7 @@ def build_index():
         for api in group_data["items"].values():
             all_apis.append({**api, "group": group, "href": link_for_source(api["source_file"], api["line"])})
 
-    return {
+    index = {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "source": {
             "frontend_spec": FRONT_SPEC_PATH.relative_to(ROOT).as_posix(),
@@ -657,6 +727,8 @@ def build_index():
             "apis": all_apis,
         },
     }
+    index["ai_brief"] = build_ai_brief(index)
+    return index
 
 
 HTML_TEMPLATE = """<!doctype html>
@@ -705,6 +777,18 @@ HTML_TEMPLATE = """<!doctype html>
     }
     .meta { color: var(--muted); font-size: 12px; }
     .stats { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .header-right {
+      display: grid;
+      gap: 8px;
+      justify-items: end;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
     .stat {
       border: 1px solid var(--line);
       background: #fafbfc;
@@ -750,6 +834,21 @@ HTML_TEMPLATE = """<!doctype html>
       cursor: pointer;
     }
     button:hover { border-color: var(--accent); }
+    .copy-btn {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+    }
+    .copy-btn:hover { filter: brightness(0.96); }
+    .text-link {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: var(--text);
+      font-size: 13px;
+    }
     .section-list { display: grid; gap: 8px; }
     .section-item {
       width: 100%;
@@ -877,6 +976,8 @@ HTML_TEMPLATE = """<!doctype html>
     @media (max-width: 980px) {
       header { display: block; }
       .stats { justify-content: flex-start; margin-top: 12px; }
+      .header-right { justify-items: start; margin-top: 12px; }
+      .actions { justify-content: flex-start; }
       main { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); }
       .grid { grid-template-columns: 1fr; }
@@ -889,7 +990,14 @@ HTML_TEMPLATE = """<!doctype html>
       <h1>사장님 웹앱 ↔ 백엔드 명세 인덱스</h1>
       <div class="meta" id="generatedMeta"></div>
     </div>
-    <div class="stats" id="stats"></div>
+    <div class="header-right">
+      <div class="stats" id="stats"></div>
+      <div class="actions">
+        <button class="copy-btn" id="copyAiBriefBtn" type="button">AI 요약 복사</button>
+        <a class="text-link" href="owner_webapp_backend_index.ai.txt">AI용 TXT 열기</a>
+        <span class="meta" id="copyAiBriefStatus"></span>
+      </div>
+    </div>
   </header>
   <main>
     <aside>
@@ -1144,9 +1252,30 @@ HTML_TEMPLATE = """<!doctype html>
         : `<div class="meta">검색어를 입력하면 필드/API가 표시됩니다.</div>`;
     }
 
+    async function copyAiBrief() {
+      const status = document.getElementById("copyAiBriefStatus");
+      try {
+        await navigator.clipboard.writeText(data.ai_brief || "");
+        status.textContent = "복사됨";
+      } catch (error) {
+        const textarea = document.createElement("textarea");
+        textarea.value = data.ai_brief || "";
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        status.textContent = "복사됨";
+      }
+      window.setTimeout(() => { status.textContent = ""; }, 1800);
+    }
+
     document.getElementById("filterInput").addEventListener("input", renderList);
     document.getElementById("statusFilter").addEventListener("change", renderList);
     document.getElementById("globalSearch").addEventListener("input", renderGlobalResults);
+    document.getElementById("copyAiBriefBtn").addEventListener("click", copyAiBrief);
     renderStats();
     renderList();
     renderDetail();
@@ -1161,6 +1290,8 @@ def write_outputs(index):
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     INDEX_JSON_PATH.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+    AI_TEXT_PATH.write_text(index["ai_brief"], encoding="utf-8")
+    SHARED_AI_TEXT_PATH.write_text(index["ai_brief"], encoding="utf-8")
     json_for_html = json.dumps(index, ensure_ascii=False).replace("</", "<\\/")
     html = HTML_TEMPLATE.replace("__INDEX_DATA__", json_for_html)
     INDEX_HTML_PATH.write_text(html, encoding="utf-8")
@@ -1173,6 +1304,8 @@ def main():
     print(f"saved: {INDEX_JSON_PATH}")
     print(f"saved: {INDEX_HTML_PATH}")
     print(f"saved: {SHARED_HTML_PATH}")
+    print(f"saved: {AI_TEXT_PATH}")
+    print(f"saved: {SHARED_AI_TEXT_PATH}")
     print(f"sections: {index['stats']['mapping_sections']}")
     print(f"fields: {index['stats']['backend_fields']}")
     print(f"apis: {index['stats']['apis']}")
