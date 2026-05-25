@@ -6,10 +6,20 @@
 공통 원칙:
 - 백엔드 원본은 spec_text/*.md이고, 이 요약은 그 원본을 화면 구현 관점으로 압축한 것입니다.
 - API endpoint와 필드명은 아래 목록을 우선 사용합니다. 목록에 없는 값이 필요하면 백엔드 담당자에게 확인합니다.
-- 에러 처리는 UNAUTHORIZED, FORBIDDEN, VERIFICATION_REQUIRED, VALIDATION_ERROR, CONFLICT, RATE_LIMITED를 화면에서 구분합니다.
+- 에러 처리는 아래 '공통 에러 처리 패턴'을 참고합니다.
 - 사장님 사업자 인증 전에는 초안 작성은 허용하지만 공개 전환과 예약 운영 처리는 막습니다.
 - 날짜/시간은 서버 UTC 저장, 화면은 샵 로컬 시간대로 표시합니다.
-- 리스트는 cursor 기반 페이지네이션을 기본으로 가정합니다.
+- 리스트는 cursor 기반 페이지네이션(limit 20 기본, 50 최대)을 기본으로 가정합니다.
+
+공통 에러 처리 패턴 (모든 API 호출 후 response.ok가 아니면 아래 순서로 처리):
+- 401 UNAUTHORIZED → 토큰 만료. refresh token으로 재발급 시도 → 실패 시 로그인 화면으로 이동.
+- 403 FORBIDDEN → "이 작업에 대한 권한이 없습니다" 토스트 표시.
+- 403 VERIFICATION_REQUIRED → "사업자 인증을 먼저 완료해주세요" 모달 + 인증 화면 이동 버튼. FORBIDDEN과 반드시 구분 처리.
+- 404 NOT_FOUND → "요청한 정보를 찾을 수 없습니다" 표시 + 목록으로 이동.
+- 409 CONFLICT → "다른 사용자가 이미 처리했습니다. 새로고침해주세요" 안내 + 자동 재조회.
+- 422 VALIDATION_ERROR → error.field_errors를 순회하며 해당 입력칸 아래에 에러 메시지 인라인 표시.
+- 429 RATE_LIMITED → "잠시 후 다시 시도해주세요" 토스트 + 버튼 비활성화 3초.
+- 500 INTERNAL_ERROR → "일시적인 오류입니다. 잠시 후 다시 시도해주세요" 토스트.
 
 핵심 상태 규칙:
 - MVP는 1사장님=1샵 단수 구조입니다. 사장님 웹에서는 /owner/shop, /owner/designs, /owner/designers 계열을 우선 사용합니다.
@@ -18,38 +28,49 @@
 - 디자인 이미지는 1~5장입니다. 이미지 변경 시 AI 분석을 다시 시작합니다.
 - 사용자 노출 조건은 owner 승인 + shop active + design active + ai_analysis_status=done 조합입니다.
 
+예약 상태별 사장님 웹 버튼 매핑:
+- pending → 수락(accept), 거절(reject). 유저도 취소 가능.
+- payment_pending → 입금 확인(payment-confirmed), 샵 취소(cancel). 유저도 입금 완료 알림 가능.
+- confirmed → 완료(complete), 노쇼(no-show, 시작 30분 후부터), 샵 취소(cancel). 유저도 취소 가능.
+- rejected, cancelled_by_user, cancelled_by_shop, no_show, completed → 액션 없음 (읽기 전용).
+
+디자인 분석 상태별 사장님 웹 표시:
+- pending/in_progress → "분석 중" 표시. 사장님 액션 없음. 고객 미노출.
+- done → "분석 완료". 노출/숨김 가능. 고객 노출 가능.
+- failed → "분석 실패" + 재분석 버튼(POST /owner/designs/{id}/reanalyze). 고객 미노출.
+
 기능별 구현 컨텍스트:
 
 ## 1. 회원가입 / 로그인
 요약: 사장님 계정 생성, 사업자 인증, 로그인/로그아웃, 비밀번호 재설정 흐름.
 구현 가이드:
-- 가입 완료 후 `GET /owner/me`로 `verification_status`를 확인하고, `pending/rejected/approved`에 따라 온보딩 화면을 분기한다.
-- `VERIFICATION_REQUIRED`는 소유권 오류가 아니라 승인 상태 문제이므로 `FORBIDDEN`과 다른 안내 화면으로 연결한다.
-- 비밀번호 재설정은 미가입 이메일도 동일 응답을 보여 사용자 존재 여부가 노출되지 않게 처리한다.
+- 초기 진입: 로컬 스토리지에 토큰이 있다면 가장 먼저 `GET /owner/me` API를 호출해서 현재 사장님의 가입/승인 상태(`verification_status`)를 확인해주세요.
+- 미인증 처리: 토큰이 아예 없거나 API 호출 결과로 `401 Unauthorized` 에러가 발생한다면, 유저가 당황하지 않게 자연스럽게 '로그인 화면'으로 이동시켜주세요.
+- 인증 상태 분기: `VERIFICATION_REQUIRED` 에러는 '사업자 승인 대기/반려' 상태라는 뜻입니다. 완전 권한이 없는 `FORBIDDEN`과 명확히 구분해서, '사업자 인증 서류 제출 화면'으로 예쁘게 연결시켜주세요.
+- 비밀번호 재설정: 가입되지 않은 이메일로 재설정 요청이 들어오더라도 동일한 완료 메시지를 띄워주세요. (보안상 유저 정보 존재 여부를 노출하지 않기 위함입니다.)
 체크포인트:
 - FORBIDDEN과 VERIFICATION_REQUIRED를 프론트에서 서로 다른 안내로 분기해야 함.
 - 사업자 인증 rejected 상태는 같은 제출 API로 재제출하면 pending으로 돌아감.
 API 호출 순서:
-- 앱 진입 시 저장된 토큰이 있으면 `GET /owner/me`를 먼저 호출한다.
-- 토큰이 없거나 401이면 로그인 화면을 보여준다.
-- 회원가입 제출 시 `POST /owner/auth/register`를 호출하고 성공하면 사업자 인증 제출 화면으로 이동한다.
-- 로그인 성공 후 다시 `GET /owner/me`를 호출해 `verification_status` 기준으로 화면을 분기한다.
-- 사업자 인증 제출 또는 재제출은 `POST /owner/business-verification`로 처리한다.
+- [초기 진입]: 사용자가 앱을 켰을 때 로컬 스토리지에 토큰이 있다면, 가장 먼저 `GET /owner/me` API를 호출해서 현재 사장님의 가입/승인 상태를 확인해주세요.
+- [미인증 처리]: 토큰이 아예 없거나 API 호출 결과로 `401 Unauthorized` 에러가 발생한다면, 당황하지 않고 자연스럽게 '로그인 화면'으로 이동시켜주세요.
+- [회원가입 흐름]: 회원가입 폼을 다 채우고 [가입하기] 버튼을 누르면 `POST /owner/auth/register`를 호출합니다. 성공(200) 응답을 받으면 지체 없이 '사업자 인증 서류 제출 화면'으로 넘겨주시면 됩니다.
+- [로그인 성공 후]: 토큰을 새로 받았다면 다시 `GET /owner/me`를 호출하여 `verification_status`를 보고, 승인되었으면 대시보드로, 대기 중이면 안내 화면으로 분기해주세요.
+- [사업자 서류 제출]: 사업자 등록증 사진과 번호를 입력해 제출(또는 재제출)할 때는 `POST /owner/business-verification` API를 호출하여 처리합니다.
 버튼/이벤트 처리:
-- 회원가입 버튼 -> POST /owner/auth/register -> 성공: 가입 완료 후 사업자 인증 화면 이동 / 실패: VALIDATION_ERROR면 필드별 메시지 표시
-- 로그인 버튼 -> POST /owner/auth/login -> GET /owner/me -> 성공: 승인 상태에 맞는 첫 화면 이동 / 실패: 401이면 이메일/비밀번호 확인 안내
-- 사업자 인증 제출 -> POST /owner/business-verification -> 성공: pending 안내 화면 표시 / 실패: 파일/사업자번호 오류를 입력칸 아래 표시
-- 비밀번호 재설정 요청 -> POST /owner/auth/password-reset/request -> 성공: 항상 같은 완료 안내 표시 / 실패: 서버 오류만 공통 오류 표시
+- [버튼] 회원가입 -> POST /owner/auth/register -> 성공: 가입 성공 토스트를 띄우고 사업자 인증 화면으로 즉시 이동시킵니다. / 실패: 백엔드에서 VALIDATION_ERROR가 오면 팝업 대신 입력칸 바로 아래에 빨간 텍스트로 에러 내용을 각각 표시해주세요.
+- [버튼] 로그인 -> POST /owner/auth/login 호출 후 GET /owner/me 연속 호출 -> 성공: 현재 승인 상태(verification_status)를 확인하여 그에 맞는 첫 화면(대시보드 또는 대기 화면)으로 이동시킵니다. / 실패: 401 에러 시 '이메일이나 비밀번호를 다시 확인해주세요'라는 친절한 문구를 입력창 근처에 띄웁니다.
+- [버튼] 사업자 인증 제출 -> POST /owner/business-verification -> 성공: 화면을 '사업자 승인 대기 중(pending)' 안내 화면으로 부드럽게 전환시킵니다. / 실패: 파일 용량 초과나 사업자번호 형식이 틀렸다면 즉각 인라인 에러 텍스트로 고칠 곳을 알려줍니다.
+- [버튼] 비밀번호 재설정 -> POST /owner/auth/password-reset/request -> 성공: 성공이든 미가입 이메일이든 보안을 위해 무조건 '재설정 이메일을 보냈습니다'라는 동일한 완료 모달을 띄웁니다. / 실패: 네트워크 단절 등 진짜 서버 오류(500)일 때만 공통 에러 모달을 띄워줍니다.
 화면 상태:
-- anonymous: 로그인/회원가입만 노출
-- pending: 초안 작성 가능, 공개/예약 처리 버튼 비활성화
-- rejected: 반려 사유 표시 + 재제출 버튼 노출
-- approved: 대시보드와 운영 기능 진입 허용
+- `anonymous`: 로그인 안 된 유저. 로그인과 회원가입 폼만 노출합니다.
+- `pending`: 가입 직후 승인 대기. 샵 초안은 작성하게 해주되, [공개 전환]이나 [예약 처리] 등 핵심 비즈니스 버튼은 클릭 못 하게 Disabled 처리합니다.
+- `rejected`: 서류 반려됨. 반려 사유를 눈에 띄게 붉은 박스로 표시하고 [서류 재제출하기] 버튼을 큼직하게 노출해주세요.
+- `approved`: 심사 통과. 대시보드와 모든 운영 기능 진입을 허용하는 완전한 사장님 상태입니다.
 QA 체크리스트:
-- [ ] 토큰 없이 `/owner/me` 호출 실패 시 로그인 화면으로 이동하는지 확인
-- [ ] pending 계정으로 공개 버튼을 눌렀을 때 `VERIFICATION_REQUIRED` 안내가 나오는지 확인
-- [ ] rejected 계정에서 재제출 후 pending 화면으로 바뀌는지 확인
-- [ ] 미가입 이메일 비밀번호 재설정 요청도 동일한 완료 문구를 보여주는지 확인
+- [ ] 개발자 도구에서 토큰을 수동으로 삭제하고 `/owner/me` 호출 시, 빈 화면에서 멈추지 않고 '로그인 화면'으로 잘 리다이렉트 되는지 테스트해주세요.
+- [ ] pending 계정으로 억지로 샵 공개 토글을 눌렀을 때, 일반 403 에러가 아닌 `VERIFICATION_REQUIRED` 코드를 잡아서 '사업자 인증이 필요합니다' 모달을 잘 띄우는지 확인해주세요.
+- [ ] rejected 상태에서 서류를 재제출하면 API 성공 직후 즉시 pending 화면으로 레이아웃이 바뀌는지 눈으로 확인해주세요.
 관련 필드: Owner.email, Owner.password, Owner.owner_name, Owner.phone, Owner.business_number, Owner.business_license_image, Owner.verification_status
 관련 API:
 - POST /owner/auth/register : 사장님 회원가입
@@ -64,34 +85,33 @@ QA 체크리스트:
 ## 2. 샵 설정
 요약: 샵 기본 정보, 영업시간, 예약 운영 정책, 현장결제/계좌이체 설정.
 구현 가이드:
-- MVP는 1사장님=1샵이다. 프론트 라우팅과 상태 저장에서 `shop_id`를 직접 들고 다니기보다 `/owner/shop` 단수 리소스로 취급한다.
-- 사업자 승인 전에는 draft 초안 저장을 허용하되, `visibility=active` 공개 전환과 예약 운영 버튼은 승인 후에만 활성화한다.
-- `auto_accept` 기본값은 `false`이며, `auto_accept=true`일 때 `bank_transfer_guide` 선택지를 비활성화해야 한다.
+- 샵 리소스 단수 취급: 우리 서비스는 사장님 1명당 샵 1개(MVP 기준)만 가집니다. 따라서 프론트 라우팅이나 전역 상태에서 `shop_id`를 복잡하게 들고 다닐 필요 없이 무조건 `/owner/shop` 단수 API를 호출하시면 됩니다.
+- 초안 저장과 공개 전환: 사업자 승인이 나기 전(pending)이라도 샵 정보를 미리 작성하고 임시 저장(draft)할 수는 있어야 합니다. 단, 고객에게 샵을 노출하는 `visibility=active` 버튼이나 예약 운영 시작 버튼은 반드시 승인(approved) 후에만 켤 수 있게 비활성화(disabled) 해주세요.
+- 설정 충돌 방지 UI: [자동 예약 수락(auto_accept=true)]을 켰을 때, 결제 수단 중 [계좌이체 안내(bank_transfer_guide)] 옵션이 아예 클릭되지 않도록 회색으로 막아주세요. 백엔드에서도 거부하겠지만 프론트에서 먼저 막아주는 유저 경험이 핵심입니다.
 체크포인트:
 - MVP는 1사장님=1샵 단수 구조이며 사장님 웹 API는 /owner/shop 기준으로 사용.
 - auto_accept=true이면 bank_transfer_guide 조합은 백엔드도 VALIDATION_ERROR로 거부.
 API 호출 순서:
-- 샵 설정 화면 진입 시 `GET /owner/shop`을 호출한다.
-- 샵이 없으면 빈 초안 폼을 보여주고 저장 시 `POST /owner/shop`을 호출한다.
-- 샵이 있으면 기본 정보 수정은 `PATCH /owner/shop`, 영업시간은 `PATCH /owner/shop/business-hours`로 나눈다.
-- 예약 정책은 `PATCH /owner/shop/reservation-policy`, 결제 방식은 `PATCH /owner/shop/payment-method`로 저장한다.
-- 공개/숨김 토글은 `PATCH /owner/shop/visibility`를 호출하되 승인 전에는 버튼을 비활성화한다.
+- [초기 진입]: 샵 설정 화면에 들어오면 `GET /owner/shop`을 호출하여 샵 정보를 가져옵니다.
+- [초안 폼 렌더링]: 아직 샵 데이터가 404로 없으면 빈 입력 폼을 띄워주고, 폼 작성 후 저장할 때 `POST /owner/shop`으로 생성합니다.
+- [부분 수정 분리]: 샵 데이터가 이미 있다면, [기본 정보]는 `PATCH /owner/shop`, [영업시간]은 `PATCH /owner/shop/business-hours` 로 각각 나누어 저장 버튼과 API를 분리해주세요.
+- [정책 및 결제]: 마찬가지로 [예약 정책] 탭은 `PATCH /owner/shop/reservation-policy`, [결제 방식] 탭은 `PATCH /owner/shop/payment-method`로 저장 로직을 분리해 관리합니다.
+- [공개 상태 토글]: 스위치를 눌러 공개/숨김을 바꿀 때는 `PATCH /owner/shop/visibility`를 호출합니다. 단, 아직 사업자 승인 전이라면 이 스위치를 회색으로 막아둬야 합니다.
 버튼/이벤트 처리:
-- 기본 정보 저장 -> PATCH /owner/shop 또는 POST /owner/shop -> 성공: 저장 완료 토스트 + 화면 값 갱신 / 실패: 주소/전화번호 오류를 필드별 표시
-- 영업시간 저장 -> PATCH /owner/shop/business-hours -> 성공: 캘린더/예약 가능 시간 재계산 안내 / 실패: 시간 겹침 오류 표시
-- 결제 방식 저장 -> PATCH /owner/shop/payment-method -> 성공: 결제 안내 미리보기 갱신 / 실패: 계좌 필수값 누락 표시
-- 공개 토글 -> PATCH /owner/shop/visibility -> 성공: active/hidden 배지 갱신 / 실패: VERIFICATION_REQUIRED면 인증 안내 모달 표시
+- [버튼] 샵 기본 정보 저장 -> PATCH /owner/shop -> 성공: 화면 하단에 '저장 완료' 토스트를 띄워주고, 입력된 값으로 화면 상태(Context/Store)를 즉시 갱신합니다. / 실패: 주소 누락, 전화번호 포맷 등의 에러는 팝업 대신 각 입력칸 하단에 빨간 안내 문구로 콕 집어 표시해주세요.
+- [버튼] 영업시간 저장 -> PATCH /owner/shop/business-hours -> 성공: 저장 성공 시 '영업시간이 변경되어 향후 예약 가능 시간이 재계산됩니다'라는 안내 툴팁을 잠깐 띄워주면 좋습니다. / 실패: 시간대가 겹치는 등 논리 오류가 발생하면 캘린더/시간 선택기 쪽에 경고를 표시합니다.
+- [버튼] 결제 방식 저장 -> PATCH /owner/shop/payment-method -> 성공: 결제 수단 안내 텍스트나 미리보기 화면을 방금 저장한 내용으로 즉각 업데이트해서 보여줍니다. / 실패: 계좌이체를 골랐는데 예금주나 계좌번호 입력칸이 비어있으면 저장 버튼 자체를 막거나 누를 때 입력칸을 붉게 깜빡여주세요.
+- [토글] 샵 공개 상태 -> PATCH /owner/shop/visibility -> 성공: 성공 시 헤더의 샵 뱃지를 active(초록색) / hidden(회색)으로 즉시 갈아끼워 줍니다. / 실패: 승인이 안 끝났는데(`VERIFICATION_REQUIRED`) 누르려 하면 스위치를 원복시키고 '인증 승인이 필요합니다' 모달을 띄워주세요.
 화면 상태:
-- no_shop: 샵 초안 생성 폼
-- draft_allowed: 승인 전 초안 수정 가능
-- active: 고객 검색/예약 진입 가능
-- hidden: 고객에게 숨김, 사장님 수정은 가능
+- `no_shop`: 아직 샵 데이터를 한 번도 안 만든 상태. 비어있는 초안 생성 폼을 띄워 유도를 시작합니다.
+- `draft_allowed`: 사업자 승인 대기 중(pending)이라도 텍스트 입력과 임시 저장은 가능한 유연한 상태입니다.
+- `active`: 고객 앱에 노출되고 검색과 예약 진입이 가능한 진짜 샵 운영 상태입니다.
+- `hidden`: 사장님이 원해서 임시로 숨긴 상태. 사장님 본인은 수정이 가능하지만 고객에겐 보이지 않습니다.
 QA 체크리스트:
-- [ ] 승인 전 샵 초안 저장은 성공하지만 공개 전환은 막히는지 확인
-- [ ] `auto_accept=true`와 `bank_transfer_guide` 조합을 프론트에서 선택 불가로 막는지 확인
-- [ ] 계좌이체 선택 시 예약금/은행/계좌번호/예금주가 모두 필수인지 확인
-- [ ] 이미지 저장 후 새로고침해도 썸네일과 이미지 목록이 유지되는지 확인
-관련 필드: Shop.name, Shop.address, Shop.address_detail, Shop.region, Shop.lat, Shop.lng, Shop.phone, Shop.description, Shop.thumbnail_url, Shop.image_urls, Shop.visibility, Shop.business_hours, Shop.auto_accept, Shop.reservation_policy, Shop.payment_method, Shop.deposit_amount, Shop.bank_name, Shop.bank_account_number, Shop.bank_account_holder
+- [ ] 사업자 승인 전(pending) 계정으로 로그인한 상태에서 샵 정보를 이것저것 적고 저장을 누르면 성공해야 하고, 샵 공개 토글을 누르면 명확히 막히는지 직접 테스트해주세요.
+- [ ] [예약 정책] 탭에서 `자동 수락` 토글을 켠 상태일 때, [결제 방식] 탭으로 이동하면 `계좌이체 안내` 선택 박스가 회색으로 잠겨서 아예 클릭을 못 하게 막혀있는지 확인해주세요.
+- [ ] 계좌이체 옵션을 선택했을 때, 나타나는 4가지 하위 입력칸(예약금액, 은행명, 계좌번호, 예금주)을 다 채우기 전까지는 [저장] 버튼이 활성화되지 않는지 프론트 validation을 확인해주세요.
+관련 필드: Shop.name, Shop.address, Shop.address_detail, Shop.region, Shop.lat, Shop.lng, Shop.phone, Shop.description, Shop.thumbnail_url, Shop.image_urls, Shop.visibility, Shop.business_hours, Shop.auto_accept, Shop.reservation_policy, Shop.payment_method, Shop.deposit_amount, Shop.bank_name, Shop.bank_account_number, Shop.bank_account_holder, Shop.rating_avg, Shop.rating_count, Shop.favorite_count
 관련 API:
 - POST /owner/shop : 내 단수 샵 초안 생성. 사업자 승인 전에도 draft 작성 가능. payment_method=bank_transfer_guide면 deposit_amount, bank_name, bank_account_numbe...
 - GET /owner/shop : 내 단수 샵 상세/초안 조회
@@ -105,32 +125,31 @@ QA 체크리스트:
 ## 3. 디자이너 관리
 요약: 디자이너 추가/수정, 전문 태그, 주간 근무시간, 임시 불가 시간, 비활성화.
 구현 가이드:
-- 디자이너는 내 단수 샵 하위 리소스다. 목록/추가/수정 화면은 `/owner/designers` 계열만 사용하면 된다.
-- `specialty_tags`는 MVP에서 프론트 입력 UI를 만들지 않아도 되는 선택 필드다. 화면 복잡도를 줄이고 이름/직급/경력/사진/활성 상태에 집중한다.
-- 비활성 디자이너는 신규 예약 후보에서 제외되지만 기존 예약은 남으므로 예약 상세에서 비활성 표시가 필요하다.
+- 디자이너 목록 관리: 디자이너는 내 단수 샵에 속한 하위 리소스입니다. 디자이너 목록을 불러오거나 추가/수정할 때는 `/owner/designers` 계열 API만 깔끔하게 사용하시면 됩니다.
+- 전문 태그(specialty_tags) 생략: 현재 이 필드는 단순 텍스트 배열이라 MVP에서는 프론트 입력 UI를 과감히 생략해도 됩니다. 이름, 직급, 경력, 프로필 사진, 활성 상태 등 필수 정보 입력 화면 구성에 먼저 집중해주세요.
+- 비활성 디자이너 표시: 디자이너를 비활성화하면 신규 예약 캘린더의 선택지에서는 사라지지만, 이미 그 디자이너에게 예약된 과거 내역은 남습니다. 따라서 예약 상세 화면에서는 '이 디자이너가 현재 비활성 상태'라는 것을 작은 배지로라도 알려줘야 합니다.
 체크포인트:
 - specialty_tags는 현재 자유 입력 string[]이며 검색 대상이 아니라 디스플레이 메타데이터.
 - 비활성 디자이너의 기존 confirmed 예약 처리 방식은 화면에서 별도 안내가 필요.
 API 호출 순서:
-- 디자이너 관리 화면 진입 시 `GET /owner/designers`를 호출한다.
-- 추가 버튼은 `POST /owner/designers`, 상세 진입은 `GET /owner/designers/{designer_id}`를 호출한다.
-- 기본 정보 수정은 `PATCH /owner/designers/{designer_id}`로 저장한다.
-- 주간 근무시간은 `PATCH /owner/designers/{designer_id}/schedule`, 임시 휴무는 `POST /owner/designers/{designer_id}/time-off`로 저장한다.
-- 삭제/비활성화 버튼은 `DELETE /owner/designers/{designer_id}`를 호출한 뒤 목록을 다시 불러온다.
+- [목록 진입]: 디자이너 관리 화면에 진입하면 `GET /owner/designers` API로 소속 디자이너 목록을 쭉 가져와 리스트업합니다.
+- [추가 및 상세]: 새 디자이너를 만들 때는 `POST /owner/designers`, 특정 디자이너 카드를 눌러 상세 화면에 들어갈 때는 `GET /owner/designers/{designer_id}`를 호출합니다.
+- [기본 정보 수정]: 이름, 프로필 이미지 등은 상세 화면 안에서 `PATCH /owner/designers/{designer_id}`로 즉시 저장합니다.
+- [스케줄 관리]: 고정된 주간 근무시간을 바꿀 때는 `PATCH /owner/designers/{id}/schedule`, 연차 등 임시 휴무일을 찍어줄 때는 `POST /owner/designers/{id}/time-off`를 호출합니다.
+- [비활성화/삭제]: 퇴사하거나 당분간 쉬는 디자이너는 `DELETE /owner/designers/{designer_id}`로 처리하고 프론트 목록을 갱신합니다.
 버튼/이벤트 처리:
-- 디자이너 추가 -> POST /owner/designers -> 성공: 목록 상단에 새 디자이너 표시 / 실패: 이름/직급 필수 오류 표시
-- 근무시간 저장 -> PATCH /owner/designers/{designer_id}/schedule -> 성공: 예약 가능 시간 갱신 안내 / 실패: 시간 범위 오류 표시
-- 임시 휴무 추가 -> POST /owner/designers/{designer_id}/time-off -> 성공: 해당 날짜 예약 불가 표시 / 실패: 이미 예약이 있으면 충돌 안내
-- 비활성화 -> DELETE /owner/designers/{designer_id} -> 성공: 신규 예약 후보에서 제외 / 실패: 기존 예약 존재 시 안내 표시
+- [버튼] 새 디자이너 추가 -> POST /owner/designers -> 성공: 저장 후 목록 화면으로 돌아오면 방금 추가된 디자이너 카드가 목록 상단에 새롭게 보이도록 추가해줍니다. / 실패: 이름이나 직급 등 필수값이 비어있으면 폼 에러(인라인 붉은 글씨)를 표시합니다.
+- [버튼] 근무시간 변경 -> PATCH /owner/designers/{designer_id}/schedule -> 성공: 저장 후 '예약 가능한 슬롯이 새 근무시간에 맞춰 조정되었습니다' 류의 성공 토스트를 띄웁니다. / 실패: 시작 시간이 종료 시간보다 늦게 설정되는 등 범위 오류 시 UI 단에서 빨간색 테두리로 피드백을 줍니다.
+- [버튼] 임시 휴무(Time-off) 등록 -> POST /owner/designers/{designer_id}/time-off -> 성공: 성공하면 사장님 스케줄러 캘린더에 해당 날짜 전체를 회색(휴무) 블록으로 덮어 칠해줍니다. / 실패: 해당 날짜에 이미 확정된 예약이 존재해서 백엔드가 충돌(CONFLICT)을 뱉으면, '이미 예약된 고객이 있습니다. 예약을 먼저 취소해주세요' 모달을 띄웁니다.
+- [버튼] 디자이너 비활성화 -> DELETE /owner/designers/{designer_id} -> 성공: 해당 디자이너를 신규 예약 배정 후보자 리스트에서 즉시 제거(필터링)합니다. / 실패: 기존에 이미 이 디자이너에게 예약된 건들이 있다면, 예약 상세 뷰에서 이름 옆에 '(비활성)' 딱지를 붙여 사장님이 헷갈리지 않게 합니다.
 화면 상태:
-- active: 신규 예약 후보에 노출
-- inactive: 기존 예약은 남기고 신규 후보에서 제외
-- empty: 디자이너 없음 안내 + 추가 버튼
+- `active`: 정상적으로 일하고 있는 디자이너. 유저 앱에서 예약을 잡을 때 담당자 후보로 노출됩니다.
+- `inactive`: 퇴사나 장기 휴가로 비활성화된 디자이너. 과거 예약 기록엔 남아있지만, 앞으로의 신규 예약 후보에서는 쏙 빠져야 합니다.
+- `empty`: 아직 등록된 디자이너가 한 명도 없는 상태. 빈 깡통 화면 대신 귀여운 일러스트와 함께 [첫 디자이너를 등록해보세요!] 같은 유도 버튼을 정중앙에 띄워주세요.
 QA 체크리스트:
-- [ ] 디자이너가 0명일 때 빈 상태와 추가 버튼이 보이는지 확인
-- [ ] 비활성 디자이너가 디자인 가능 디자이너 선택지에서 빠지는지 확인
-- [ ] 근무시간 변경 후 예약 가능 슬롯 화면이 갱신되는지 확인
-- [ ] 임시 휴무일에 신규 예약이 막히는지 확인
+- [ ] 디자이너가 0명인 초기 상태일 때, 화면이 텅 비어있지 않고 빈 상태(Empty State) 디자인과 추가 버튼이 예쁘게 나오는지 확인해주세요.
+- [ ] 방금 비활성화 처리한 디자이너가 예약 등록 시 담당자 선택 드롭다운 목록에서 감쪽같이 사라졌는지 프론트에서 꼼꼼히 확인해주세요.
+- [ ] 디자이너의 임시 휴무를 등록한 날짜를 클릭했을 때, '신규 예약 추가' 버튼이 프론트에서 제대로 잠겨있는지 확인해주세요.
 관련 필드: Designer.designer_id, Designer.shop_id, Designer.name, Designer.career_years, Designer.rank, Designer.profile_image_url, Designer.specialty_tags, Designer.is_active
 관련 API:
 - POST /owner/designers : 내 단수 샵 디자이너 추가
@@ -144,35 +163,34 @@ QA 체크리스트:
 ## 4. 디자인 등록 및 관리
 요약: 디자인 등록, 이미지 업로드, owner_tags, LLM 분석 상태, 재분석, 노출/숨김/삭제.
 구현 가이드:
-- 디자인 이미지는 1~5장 제한이다. 프론트 업로드 UI와 백엔드 리소스 반영 API가 같은 제한을 가져야 한다.
-- `owner_tags`는 선택값이며 수정 API에서도 `owner_tags`로 보낸다. 구버전 `tags` 파라미터를 쓰면 안 된다.
-- 사용자 노출은 `approved owner + active shop + active design + ai_analysis_status=done` 조합이다. 사장님 화면에는 왜 아직 노출되지 않는지 상태별로 설명해야 한다.
+- 이미지 갯수 검증: 디자인 이미지는 최소 1장에서 최대 5장까지만 등록 가능합니다. 프론트의 업로드 UI 컴포넌트에서도 5장이 차면 업로드 버튼을 숨기거나 비활성화해서 백엔드와 정책을 100% 맞춰주세요.
+- 오너 태그(owner_tags) 주의: 사장님이 직접 다는 태그는 반드시 `owner_tags`라는 키로 배열을 묶어서 보내야 합니다. 과거에 썼던 `tags`라는 이름으로 보내면 백엔드에서 무시되니 주의하세요.
+- 사용자 노출 조건 안내: 사장님이 디자인을 등록했다고 바로 유저 앱에 노출되지 않습니다. [사장님 계정 승인 + 샵 공개 상태 + 디자인 공개 상태 + AI 분석 완료] 4박자가 모두 맞아야 합니다. 따라서 '공개'로 설정되어 있어도 아직 노출 안 되는 상황이라면, 툴팁이나 배지로 'AI 분석 중이라 아직 노출되지 않습니다' 등을 친절하게 안내해주세요.
 체크포인트:
 - 디자인 이미지는 프론트와 백엔드 API 모두 최대 5장 제한으로 맞춤.
 - 사장님 화면은 pending+in_progress를 '분석 중' 한 상태로 묶어 표시.
 API 호출 순서:
-- 디자인 목록 진입 시 `GET /owner/designs?visibility=&ai_analysis_status=`를 호출한다.
-- 등록 폼 저장 시 이미지 1~5장과 필수값을 검증한 뒤 `POST /owner/designs`를 호출한다.
-- 상세 화면은 `GET /owner/designs/{design_id}`로 최신 AI 분석 상태를 조회한다.
-- 수정 저장은 `PATCH /owner/designs/{design_id}`를 호출한다.
-- 이미지 추가/삭제 후에는 `POST /owner/designs/{design_id}/images` 또는 `DELETE /owner/designs/{design_id}/images/{image_id}`를 호출하고 분석 상태를 pending으로 보여준다.
-- 재분석 버튼은 `POST /owner/designs/{design_id}/reanalyze`를 호출한다.
+- [목록 진입]: 디자인(손톱 포트폴리오) 목록 화면 진입 시 `GET /owner/designs`를 호출합니다. 필터링을 위해 visibility와 ai_analysis_status 쿼리를 활용할 수 있습니다.
+- [신규 등록]: 디자인 폼에 이미지(1~5장)와 가격, 설명 등을 채우고 [저장]을 누르면 프론트에서 유효성 검사 후 `POST /owner/designs`를 쏩니다.
+- [상세 및 폴링]: 디자인 카드를 누르면 `GET /owner/designs/{design_id}`를 호출하여 가장 최신의 AI 분석 상태(status)와 결과값을 화면에 뿌려줍니다.
+- [수정 처리]: 제목이나 가격, 태그 등을 수정하고 저장할 때는 `PATCH /owner/designs/{design_id}`를 호출합니다.
+- [사진 교체 시 주의]: 사진을 추가(`POST .../images`)하거나 지울(`DELETE .../images/{id}`) 경우, 백엔드에서 AI 분석 상태를 다시 pending으로 돌려버리므로 화면에서도 뱃지를 즉시 '분석 중 ⏳'으로 덮어씌워야 합니다.
+- [수동 재분석]: AI가 너무 이상하게 분석했거나 failed 떴을 때 누르는 재분석 버튼은 `POST /owner/designs/{design_id}/reanalyze`를 호출합니다.
 버튼/이벤트 처리:
-- 디자인 등록 -> POST /owner/designs -> 성공: 목록으로 이동 + 분석 중 배지 표시 / 실패: 필수값/이미지 개수 오류 표시
-- 이미지 추가 -> POST /owner/designs/{design_id}/images -> 성공: 이미지 목록 갱신 + 분석 중 전환 / 실패: 5장 초과 시 업로드 막기
-- 재분석 -> POST /owner/designs/{design_id}/reanalyze -> 성공: 분석 중 배지로 변경 / 실패: failed가 아니어도 수동 재분석 허용 여부 확인
-- 공개/숨김 -> PATCH /owner/designs/{design_id}/visibility -> 성공: active/hidden 배지 갱신 / 실패: 승인 전이면 인증 안내
+- [버튼] 새 디자인 등록 -> POST /owner/designs -> 성공: 등록 성공 토스트와 함께 목록 맨 위로 올려주고, 상태 뱃지는 무조건 'AI 분석 중'으로 달아줍니다. / 실패: 가장 흔한 에러인 필수값 누락이나 이미지 0장 업로드 시도는 API를 쏘기 전에 프론트에서 막고 폼 에러를 띄워주세요.
+- [버튼] 사진 추가/수정 -> POST /owner/designs/{design_id}/images -> 성공: 새 이미지가 렌더링되면서 동시에 디자인 전체의 뱃지를 '분석 중'으로 강제 전환시켜야 합니다. / 실패: 6장째 이미지를 올리려고 하면 파일 브라우저 창을 띄우지 말고 '최대 5장까지만 가능해요' 툴팁을 보여줍니다.
+- [버튼] AI 결과 수동 재분석 -> POST /owner/designs/{design_id}/reanalyze -> 성공: 버튼 클릭 즉시 화면 전체 또는 해당 카드를 로딩 스피너/분석 중 배지로 바꿔서 '작업이 들어갔다'는 피드백을 확실히 줍니다. / 실패: 수동 재분석이 허용되지 않는 상태(이미 분석 중 등)일 때 프론트에서 버튼을 흐리게(Disabled) 처리했는지 확인하세요.
+- [토글] 고객 노출 상태 변경 -> PATCH /owner/designs/{design_id}/visibility -> 성공: 성공하면 스위치가 초록색(ON)으로 바뀌고 리스트 뱃지도 active 갱신됩니다. / 실패: 아직 AI 분석이 덜 끝났거나(pending), 사장님 사업자 승인이 안 났다면 토글이 켜지지 않게 프론트에서 막아주세요.
 화면 상태:
-- pending/in_progress: 분석 중, 고객에게 아직 노출되지 않음
-- done + active: 고객 노출 가능
-- failed: 분석 실패, 재분석 또는 이미지 교체 버튼 표시
-- hidden: 사장님만 볼 수 있음
+- `pending/in_progress`: 방금 사진을 올려서 서버 뒤에서 AI(LLM)가 열심히 깎고 태그를 다는 중인 상태입니다. 고객 앱에선 검색되지 않습니다.
+- `done + active`: AI 분석도 무사히 끝나고, 사장님도 '공개' 토글을 켠 완벽한 영업 상태입니다. 고객이 볼 수 있습니다.
+- `failed`: 사진 화질구지 등의 이유로 AI 분석이 실패해 멈춰버린 붉은색 상태입니다. 사장님께 '사진을 교체하거나 재분석 버튼을 눌러주세요'라는 가이드를 띄워야 합니다.
+- `hidden`: 사장님이 자발적으로 공개를 끈 상태입니다. 포트폴리오 관리용으로 본인 눈에만 보입니다.
 QA 체크리스트:
-- [ ] 이미지 0장 또는 6장 이상 등록이 프론트에서 막히는지 확인
-- [ ] 등록 직후 분석 완료 전까지 고객 노출 가능 문구가 나오지 않는지 확인
-- [ ] AI 분석 실패 상태에서 재분석 버튼이 보이는지 확인
-- [ ] `owner_tags` 없이도 등록 가능한지 확인
-관련 필드: Design.title, Design.description, Design.base_price, Design.duration_minutes, Design.available_designer_ids, Design.owner_tags, Design.ai_tags, Design.ai_color_palette, Design.ai_style_category, Design.visibility, Design.ai_analysis_status, Design.ai_analysis_started_at, Design.ai_analysis_completed_at, DesignImage.original_url, DesignImage.cropped_url, DesignImage.sort_order, DesignImage.ai_transform_status, DesignImage.ai_classify_status
+- [ ] 디자인 등록 폼에서 사진을 아예 안 올리거나, 6장을 꽉 채워 올리려 할 때 백엔드 에러 전에 프론트엔드가 자체적으로 에러 메시지와 함께 막는지 테스트해주세요.
+- [ ] 새로 디자인을 등록하자마자 리스트로 돌아왔을 때, '공개' 토글이 아직 켜지지 않도록 잘 막아뒀는지 눈으로 확인해주세요 (분석이 안 끝났으므로).
+- [ ] 일부러 이상한 사진을 올려 AI 분석이 `failed` 상태가 되었을 때, 화면에 빨간 경고창과 함께 [재분석하기] 버튼이 나타나는지 확인해주세요.
+관련 필드: Design.title, Design.description, Design.base_price, Design.duration_minutes, Design.available_designer_ids, Design.owner_tags, Design.ai_tags, Design.ai_color_palette, Design.ai_style_category, Design.visibility, Design.ai_analysis_status, Design.ai_analysis_started_at, Design.ai_analysis_completed_at, Design.favorite_count, Design.view_count, DesignImage.image_id, DesignImage.original_url, DesignImage.cropped_url, DesignImage.sort_order, DesignImage.ai_transform_status, DesignImage.ai_classify_status
 관련 API:
 - POST /owner/designs : 내 단수 샵 디자인 등록 (사장님 응답 즉시 200, AI 분석은 백그라운드 큐). 이미지 최대 5장. owner_tags는 선택(0~N개). 등록 직후 visibility=active, ai_analysis_st...
 - GET /owner/designs : 내 단수 샵 디자인 목록. 필터로 visibility, ai_analysis_status 둘 다 사용 가능. 사장님 화면에서 '분석 중', '분석 실패', '숨김' 탭 구분
@@ -187,34 +205,35 @@ QA 체크리스트:
 ## 5. 예약 관리
 요약: 월간 캘린더, 예약 상세, 수락/거절/취소/완료/노쇼, 입금 확인 요청 뱃지.
 구현 가이드:
-- 단순 `pending`은 슬롯 hard-lock이 아니다. 사장님 웹은 미처리 pending을 `created_at` 오름차순으로 보여주고, 수락 시점에 충돌을 재검사한다.
-- 계좌이체 샵은 `pending -> payment_pending -> confirmed` 흐름이다. 유저의 [입금 완료]만으로 확정되지 않고 사장의 [입금 확인됨]이 필요하다.
-- 노쇼는 MVP에서 방어적으로 구현한다. `confirmed`이고 시술 시작 30분 이후일 때만 가능하며, 금전/패널티 자동 처리는 하지 않는다.
+- 신규 예약(pending)의 성격: pending 상태는 아직 해당 시간대가 캘린더에서 완벽히 잠긴(hard-lock) 상태가 아닙니다. 사장님 웹에서는 겹치는 시간대의 요청이라도 일단 모두 보여주되(created_at 오름차순), 사장님이 수락 버튼을 누르는 순간 겹치는지 최종 검사(CONFLICT 에러 반환)를 수행해야 합니다.
+- 계좌이체 예약 흐름: [계좌이체 샵]의 경우, 사장님이 예약을 수락하면 `payment_pending`(입금 대기) 상태가 됩니다. 유저가 앱에서 '입금 완료했어요!'를 눌러도 여전히 payment_pending입니다. 사장님이 통장 내역을 확인하고 [입금 확인 완료] 버튼을 눌러줘야 비로소 `confirmed`(확정)가 됩니다.
+- 노쇼(No-show) 버튼 제약: MVP에서는 악의적인 노쇼 처리를 방어하기 위해 예약이 `confirmed` 상태이고, 예약 시작 시간으로부터 30분이 지난 이후에만 노쇼 버튼을 활성화시켜주세요.
 체크포인트:
 - CSV export는 API 후보가 있지만 MVP 1차 출시 제외로 표시되어야 함.
 - 입금 확인 요청 뱃지는 status/payment snapshot/입금 알림/사장님 확인 시각 4조건을 모두 봄.
 API 호출 순서:
-- 예약 화면 진입 시 `GET /owner/reservations?from=&to=&status=`를 호출한다.
-- 상세 모달을 열 때 `GET /owner/reservations/{id}`로 최신 상태를 다시 조회한다.
-- 수락은 `POST /owner/reservations/{id}/accept`, 거절은 `POST /owner/reservations/{id}/reject`를 호출한다.
-- 계좌이체 예약에서 입금 확인 버튼은 `POST /owner/reservations/{id}/payment-confirmed`를 호출한다.
-- 완료/노쇼/취소는 각각 complete/no-show/cancel API를 호출한 뒤 목록과 상세를 다시 불러온다.
+- [예약 목록 진입]: 예약 캘린더나 리스트에 들어올 때 `GET /owner/reservations?from=날짜&to=날짜&status=상태` 쿼리를 잘 조합해서 호출해 화면을 그립니다.
+- [최신화 조회]: 특정 예약 카드를 눌러 팝업/모달 상세를 띄울 때는 방금 전 상태가 바뀌었을지 모르니 `GET /owner/reservations/{id}` 단건 조회를 한 번 더 날려 최신화합니다.
+- [사장님의 응답]: 새 요청(pending)에 대해 [수락] 버튼은 `POST /owner/reservations/{id}/accept`, [거절] 버튼은 `POST /owner/reservations/{id}/reject`를 쏩니다.
+- [계좌이체 확인]: 계좌이체 정책인 샵에서, 사장님이 유저의 입금 내역을 통장에서 직접 보고 누르는 [입금 확인 완료] 버튼은 `POST /owner/reservations/{id}/payment-confirmed`입니다.
+- [시술 종료 후]: 유저가 시술을 받고 가면 `complete`, 안 나타나면 `no-show`, 예약이 취소되면 `cancel` API를 각각 날린 후 캘린더를 새로고침(refetch) 합니다.
 버튼/이벤트 처리:
-- 예약 수락 -> POST /owner/reservations/{id}/accept -> 성공: 현장결제면 confirmed, 계좌이체면 payment_pending 표시 / 실패: CONFLICT면 이미 선점된 시간 안내
-- 입금 확인 -> POST /owner/reservations/{id}/payment-confirmed -> 성공: confirmed로 변경 + 캘린더 확정 표시 / 실패: 이미 처리된 예약이면 새로고침 안내
-- 예약 거절 -> POST /owner/reservations/{id}/reject -> 성공: rejected로 변경 + 목록에서 제거 또는 상태 갱신 / 실패: 필수 사유 누락 표시
-- 노쇼 처리 -> POST /owner/reservations/{id}/no-show -> 성공: no_show 배지 표시 / 실패: 시작 30분 전이면 버튼 비활성화
+- [버튼] 예약 수락 -> POST /owner/reservations/{id}/accept -> 성공: 현장결제 샵이면 확정(confirmed) 녹색 뱃지로, 계좌이체 샵이면 입금대기(payment_pending) 주황색 뱃지로 변신시킵니다. / 실패: 그 사이 다른 고객이 낚아채서 CONFLICT가 나면 '앗, 이미 선점된 시간입니다' 모달을 띄워 상황을 알려줍니다.
+- [버튼] 입금 내역 확인 완료 -> POST /owner/reservations/{id}/payment-confirmed -> 성공: 입금 대기 딱지를 떼고 확정(confirmed) 뱃지로 바꾸며, 캘린더 해당 슬롯에 확정 디자인을 예쁘게 박아줍니다. / 실패: 혹시 그 사이 유저가 취소해서 409 에러가 나면 '취소된 예약입니다' 하고 화면을 새로고침시킵니다.
+- [버튼] 예약 거절 -> POST /owner/reservations/{id}/reject -> 성공: 목록에서 거절됨(rejected) 상태로 색상을 죽이거나, 필터 설정에 따라 아예 리스트에서 부드럽게 사라지게(애니메이션) 처리합니다. / 실패: 거절 사유 입력이 필수인데 사장님이 빈칸으로 냈다면, 텍스트 상자 주변을 붉게 흔들어주세요(Shake effect).
+- [버튼] 노쇼(No-show) 처리 -> POST /owner/reservations/{id}/no-show -> 성공: 해당 예약을 붉은색 노쇼 배지로 덮고 더 이상 변경할 수 없게 만듭니다. / 실패: 정책상 예약 시작 시간 30분 전까지는 노쇼 버튼이 프론트엔드에서 회색(Disabled)으로 굳게 잠겨 있어야 합니다.
 화면 상태:
-- pending: 사장님 수락/거절 대기, created_at 오름차순 표시
-- payment_pending: 유저 입금 및 사장 확인 대기
-- confirmed: 예약 확정, 완료/노쇼 가능 시점 대기
-- completed/no_show/cancelled/rejected: 읽기 중심 상태
+- `pending`: 사장님의 수락/거절을 목빠지게 기다리는 신규 요청. 미처리 요청은 무조건 `created_at` 오름차순(먼저 온 사람 먼저)으로 보여주세요.
+- `payment_pending`: 사장님은 수락했는데, 유저의 입금을 기다리는 상태. 또는 유저가 '입금했어요' 버튼을 눌러서 사장님이 통장을 뜯어봐야 하는 상태입니다.
+- `confirmed`: 입금까지 다 끝나고 완벽히 캘린더 슬롯을 점유한 예약 확정 상태입니다. 시술 날짜가 다가오길 기다립니다.
+- `completed` / `no_show` / `rejected`: 이미 끝난 옛날 예약들입니다. 아무 버튼도 누를 수 없는 완전한 읽기 전용 뷰로 그려주세요.
+- `cancelled_by_user` / `cancelled_by_shop`: 누가 취소했는지 명확히 보여주는 취소 상태. 샵이 취소했다면 사장님이 썼던 취소 사유(cancel_reason)를 꼭 화면 어딘가에 보여주세요.
 QA 체크리스트:
-- [ ] pending 목록이 예약 요청 생성 순서대로 보이는지 확인
-- [ ] 유저가 [입금 완료]를 눌러도 confirmed가 되지 않고 사장 확인 버튼이 남는지 확인
-- [ ] 동일 시간대 중복 수락 시 CONFLICT 안내가 나오는지 확인
-- [ ] confirmed 예약 시작 30분 전에는 노쇼 버튼이 비활성화되는지 확인
-관련 필드: Reservation.reservation_id, Reservation.user_id, Reservation.shop_id, Reservation.design_id, Reservation.designer_id, Reservation.start_datetime, Reservation.end_datetime, Reservation.duration_minutes, Reservation.status, Reservation.total_price, Reservation.reservation_policy_snapshot, Reservation.payment_method_snapshot, Reservation.deposit_amount_snapshot, Reservation.bank_transfer_guide_snapshot, Reservation.user_payment_notified_at, Reservation.owner_payment_confirmed_at, Reservation.reminder_sent_at, Reservation.user_request_memo, Reservation.cancel_reason, Reservation.cancelled_at, Reservation.completed_at, Reservation.no_show_at
+- [ ] 예약 관리 대시보드의 '신규 요청' 목록이 예약이 들어온 순서(생성된 시간순)대로 최상단부터 차곡차곡 쌓여서 잘 보이는지 확인해주세요.
+- [ ] 계좌이체 샵 예약에서 유저가 앱에서 [입금 완료]를 눌렀더라도, 사장님 화면에 아직 [입금 내역 확인 완료] 버튼이 떡하니 살아있고 확정 상태가 아닌지 교차 검증해주세요.
+- [ ] 동일한 시간에 겹치는 2개의 pending 예약 중 하나를 수락했을 때, 나머지 하나를 수락하려 하면 에러 팝업(CONFLICT)이 제대로 뜨며 막히는지 테스트하세요.
+- [ ] 확정된(confirmed) 예약 상세 화면에서, 시술 시간이 아직 30분도 안 지났는데 실수로 [노쇼 처리] 버튼을 누르지 못하도록 프론트에서 버튼을 비활성화해두었는지 확인해주세요.
+관련 필드: Reservation.reservation_id, Reservation.user_id, Reservation.shop_id, Reservation.design_id, Reservation.designer_id, Reservation.start_datetime, Reservation.end_datetime, Reservation.duration_minutes, Reservation.status, Reservation.total_price, Reservation.reservation_policy_snapshot, Reservation.payment_method_snapshot, Reservation.deposit_amount_snapshot, Reservation.bank_transfer_guide_snapshot, Reservation.user_payment_notified_at, Reservation.owner_payment_confirmed_at, Reservation.reminder_sent_at, Reservation.user_request_memo, Reservation.assigned_by, Reservation.idempotency_key, Reservation.cancel_reason, Reservation.cancelled_at, Reservation.completed_at, Reservation.no_show_at
 관련 API:
 - GET /owner/reservations : 예약 캘린더 + 미처리 pending 목록. pending 목록은 created_at 오름차순(먼저 예약 요청한 순서)으로 제공해 사장님이 순서대로 응답할 수 있게 함
 - GET /owner/reservations/export : 예약 내역 다운로드 (post-MVP 우선순위 큐). CSV 포맷으로 내보내기
@@ -230,32 +249,31 @@ QA 체크리스트:
 ## 6. 리뷰 관리
 요약: 본인 샵 리뷰 목록, 평균 별점/리뷰 수, 정렬, 리뷰 답변 작성/수정/삭제.
 구현 가이드:
-- 사장님 리뷰 화면은 `/owner/reviews`를 기본으로 사용한다. 공개 샵 리뷰 API를 우회해서 내 샵 id를 관리할 필요가 없다.
-- 미답변 리뷰 필터는 `unanswered=true` 또는 대시보드 `unanswered_review_count`와 연결한다.
-- 리뷰 답변은 1개만 허용되므로 작성/수정/삭제 버튼 상태를 `shop_reply` 존재 여부로 분기한다.
+- 내 샵 리뷰 조회: 리뷰 목록을 가져올 때 `/shops/{id}/reviews` (일반 고객용 API)를 쓸 필요가 없습니다. 사장님 토큰을 달고 전용 API인 `/owner/reviews`를 호출하면 알아서 내 샵의 리뷰들만 가져옵니다.
+- 미답변 리뷰 필터 연동: 대시보드의 '미답변 리뷰(unanswered_review_count)' 카드를 클릭해서 리뷰 화면으로 넘어왔다면, 자동으로 `unanswered=true` 쿼리 필터가 적용된 상태로 렌더링되게 해주세요.
+- 답변 버튼 분기: 리뷰당 답변은 1개만 허용됩니다. `shop_reply` 데이터가 비어있다면 [답변 작성] 버튼을, 이미 채워져 있다면 [수정] / [삭제] 버튼을 노출하는 방식으로 화면을 분기해주세요.
 체크포인트:
 - 사장님 전용 리뷰 목록 API는 별도 /owner 경로가 아니라 현재 GET /shops/{id}/reviews를 사용.
 - 대시보드의 unanswered_review_count는 shop_reply IS NULL 기준.
 API 호출 순서:
-- 리뷰 화면 진입 시 `GET /owner/reviews?sort=&unanswered=&cursor=`를 호출한다.
-- 대시보드 미답변 리뷰 카드에서 진입하면 `unanswered=true`를 붙인다.
-- 답변 작성은 `POST /reviews/{id}/reply`, 수정은 `PATCH /reviews/{id}/reply`, 삭제는 `DELETE /reviews/{id}/reply`를 호출한다.
-- 답변 변경 후 해당 리뷰 row 또는 목록을 다시 불러온다.
+- [리뷰 목록 진입]: 리뷰 화면에 처음 들어오면 `GET /owner/reviews`에 sort, unanswered, cursor 등의 필터 쿼리 파라미터를 말아서 호출합니다.
+- [미답변 필터 연동]: 대시보드에서 '미답변 리뷰 3건' 카드를 콕 찍어서 넘어온 경우엔 프론트 라우터가 똑똑하게 `unanswered=true` 쿼리를 물고 들어오게 렌더링해야 합니다.
+- [답변 달기]: 사장님이 정성껏 쓴 답변을 저장할 때는 `POST /reviews/{id}/reply`, 오타를 고칠 때는 `PATCH /reviews/{id}/reply`, 지울 때는 `DELETE /reviews/{id}/reply`를 호출합니다.
+- [상태 갱신]: 답변 관련 API(POST/PATCH/DELETE)를 쏘고 나면 해당 리뷰 카드 하나만 로컬 상태를 바꾸거나, 리스트 전체를 가볍게 refetch 해서 화면 싱크를 맞춥니다.
 버튼/이벤트 처리:
-- 답변 작성 -> POST /reviews/{id}/reply -> 성공: 답변 영역 표시 + 미답변 뱃지 제거 / 실패: 이미 답변 있으면 수정 모드로 전환
-- 답변 수정 -> PATCH /reviews/{id}/reply -> 성공: 수정된 답변 표시 / 실패: 권한 오류면 내 샵 리뷰가 아님 안내
-- 답변 삭제 -> DELETE /reviews/{id}/reply -> 성공: 미답변 상태로 변경 / 실패: 삭제 확인 모달 제공
-- 정렬 변경 -> GET /owner/reviews -> 성공: 목록 재조회 / 실패: 빈 결과면 빈 상태 표시
+- [버튼] 리뷰 답변 남기기 -> POST /reviews/{id}/reply -> 성공: 저장에 성공하면 입력창이 텍스트로 굳어지고, 리뷰 카드에 붙어있던 '미답변' 주황색 뱃지가 깔끔하게 사라집니다. / 실패: 혹시 네트워크 문제 등으로 중복 클릭되어 이미 답변이 존재하면(409), 자동으로 [수정] 모드 창으로 화면을 탈바꿈시켜줍니다.
+- [버튼] 답변 수정하기 -> PATCH /reviews/{id}/reply -> 성공: 수정 폼이 닫히면서 방금 고친 새 텍스트가 부드럽게 화면에 교체되어 렌더링됩니다. / 실패: 403 권한 에러가 뜬다면 '사장님 샵의 리뷰가 아닙니다'라는 다소 무서운 토스트를 띄웁니다.
+- [버튼] 답변 삭제하기 -> DELETE /reviews/{id}/reply -> 성공: 텍스트가 날아가고, 다시 입력 폼과 '미답변' 뱃지가 살포시 돌아오는 상태로 뷰를 되돌립니다. / 실패: 진짜 지울 건지 묻는 자그마한 확인 모달 팝업을 꼭 제공해주세요. (실수 방지)
+- [필터] 정렬 기준 변경 -> GET /owner/reviews -> 성공: 별점순/최신순 탭을 누르면 기존 리스트 데이터를 비우고 스피너를 돈 다음 새 리스트를 착 뿌려줍니다. / 실패: 검색 결과가 0건이라면 허전하지 않게 '아직 이 조건에 맞는 리뷰가 없어요' 류의 일러스트 빈 화면을 보여줍니다.
 화면 상태:
-- unanswered: 답변 작성 버튼 표시
-- answered: 수정/삭제 버튼 표시
-- empty: 리뷰 없음 또는 미답변 없음 안내
+- `unanswered`: 사장님의 댓글을 기다리는 미답변 리뷰. 가장 눈에 띄게 주황색 배지 같은 걸 붙여주고 큼직한 [답변 작성] 버튼을 노출합니다.
+- `answered`: 사장님이 이미 답글(`shop_reply`)을 달아준 리뷰. 답글 내용 밑에 작게 회색 글씨로 [수정] / [삭제] 텍스트 버튼만 붙여줍니다.
+- `empty`: 리뷰가 한 개도 없거나, '미답변' 탭을 눌렀는데 다 답변해서 텅 빈 경우. 사장님께 뿌듯함을 주는 빈 상태(Empty State) 화면을 보여주세요.
 QA 체크리스트:
-- [ ] 리뷰당 답변이 1개만 작성되는지 확인
-- [ ] 미답변 필터에서 답변 작성 후 목록에서 사라지거나 상태가 바뀌는지 확인
-- [ ] 정렬 변경 후 cursor가 초기화되는지 확인
-- [ ] 내 샵이 아닌 리뷰 답변 시 권한 오류가 처리되는지 확인
-관련 필드: Review.review_id, Review.reservation_id, Review.shop_id, Review.design_id, Review.author_user_id, Review.rating, Review.content, Review.image_urls, Review.shop_reply, Review.shop_reply_at, Review.created_at
+- [ ] 사장님이 한 리뷰에 답글을 두 번 달려고 광클했을 때 프론트가 버튼을 잠그거나, 서버가 튕겨냈을 때 알아서 에러 처리가 잘 되는지 확인해주세요.
+- [ ] [미답변 리뷰 모아보기] 탭에서 특정 리뷰에 답변을 쾅 달면, 그 즉시 그 리뷰 카드가 스르륵 리스트에서 사라지는 애니메이션(또는 렌더링 제외)이 잘 작동하는지 확인하세요.
+- [ ] 별점순 등 정렬 탭을 눌러 API를 다시 호출할 때 무한 스크롤용 `cursor` 변수를 깔끔하게 초기화(reset)해서 1페이지부터 다시 잘 불러오는지 체크해주세요.
+관련 필드: Review.review_id, Review.reservation_id, Review.shop_id, Review.design_id, Review.author_user_id, Review.rating, Review.content, Review.image_urls, Review.shop_reply, Review.shop_reply_at, Review.status, Review.tags, Review.like_count, Review.created_at
 관련 API:
 - GET /owner/reviews : 내 단수 샵 리뷰 목록. 사장님 웹 전용. sort 허용값: latest(기본) / rating_desc / rating_asc, unanswered=true이면 shop_reply IS NULL만 조회
 - GET /shops/{id}/reviews : 샵 리뷰 목록. sort 허용값: latest(기본) / rating_desc / rating_asc
@@ -267,31 +285,30 @@ QA 체크리스트:
 ## 7. 스네일 확인
 요약: 본인 샵이 태그된 스네일 조회, 샵 계정 댓글 작성/수정/삭제.
 구현 가이드:
-- 사장님 스네일 화면은 `/owner/snaps`를 기본으로 사용한다. 단수 샵 정책 기준으로 내 샵이 태그된 스네일만 조회한다.
-- 샵 댓글은 같은 댓글 API를 쓰되 서버가 `author_type=shop`, `author_shop_id=내 shop_id`로 기록한다.
-- 스네일 신고는 MVP 제외이므로 화면에서 신고 처리 흐름을 만들지 않는다.
+- 스네일 목록 조회: 스네일(커뮤니티) 화면 역시 사장님 토큰을 달고 `/owner/snaps` 전용 API를 호출하면, 굳이 필터링을 복잡하게 하지 않아도 내 샵이 태그된 스네일들만 깔끔하게 모아서 줍니다.
+- 샵 뱃지 달기: 사장님이 스네일에 댓글을 달 때는 일반 유저 댓글 작성 API와 동일한 API를 씁니다. 서버가 알아서 '이건 사장님이 단 댓글이다'라고 인식하고 `author_type=shop`으로 저장해 줍니다. 댓글을 화면에 그릴 때 이 타입이면 '샵 공식' 뱃지를 예쁘게 달아주세요.
+- 신고 기능 제외: 스네일 신고 기능은 MVP 범위에서 제외되었습니다. UI 디자인에 신고 버튼이 있더라도 과감히 숨김 처리하고 기능 구현에 시간을 쓰지 마세요.
 체크포인트:
 - 사장님 전용 스네일 목록 API는 현재 /owner 경로가 아니라 GET /shops/{id}/snaps를 사용.
 - 샵 계정 댓글은 Comment.author_type/author_shop_id로 구분.
 API 호출 순서:
-- 스네일 화면 진입 시 `GET /owner/snaps?cursor=`를 호출한다.
-- 게시물 상세은 `GET /snaps/{id}`로 불러온다.
-- 댓글 목록은 `GET /snaps/{id}/comments`를 호출한다.
-- 샵 계정 댓글 작성/수정/삭제는 comments API를 그대로 사용한다.
+- [목록 진입]: 스네일 탭(커뮤니티)을 누르면 `GET /owner/snaps?cursor=` 무한 스크롤 API를 불러 우리 샵이 태그된 사진들만 구경합니다.
+- [상세 조회]: 썸네일을 눌러 팝업/페이지로 들어가면 `GET /snaps/{id}`로 본문과 최신 좋아요 수 등을 가져옵니다.
+- [댓글 로딩]: 상세 화면 하단에서 `GET /snaps/{id}/comments`를 불러와 유저들의 반응을 주욱 나열해줍니다.
+- [샵 댓글 처리]: 사장님이 샵 이름으로 댓글을 달거나 고치거나 지울 때는 기존 유저용 댓글 API(POST/PATCH/DELETE comments)를 그대로 재사용해 날리면 됩니다.
 버튼/이벤트 처리:
-- 스네일 상세 열기 -> GET /snaps/{id} -> 성공: 이미지/태그/댓글 영역 표시 / 실패: 삭제된 게시물이면 목록에서 제거
-- 샵 댓글 작성 -> POST /snaps/{id}/comments -> 성공: 샵 뱃지 붙은 댓글 추가 / 실패: 빈 댓글 입력 방지
-- 댓글 수정 -> PATCH /comments/{id} -> 성공: 수정된 댓글 반영 / 실패: 내 샵 댓글이 아니면 버튼 숨김
-- 댓글 삭제 -> DELETE /comments/{id} -> 성공: 댓글 목록 갱신 / 실패: 삭제 확인 모달 제공
+- [행동] 스네일 상세 팝업 열기 -> GET /snaps/{id} -> 성공: 이미지 캐러셀, 본문 캡션, 샵/디자이너 태그 칩스, 그리고 댓글 영역을 한 화면에 예쁘게 펼쳐줍니다. / 실패: 혹시 그 사이 작성자가 글을 날려버려서 404가 뜬다면 팝업을 닫고 목록에서도 그 사진을 스윽 빼줍니다.
+- [버튼] 샵 공식 댓글 작성 -> POST /snaps/{id}/comments -> 성공: 댓글이 등록되면 리스트 최하단(혹은 상단 정렬에 맞춰)에 방금 쓴 댓글을 끼워넣어 줍니다. 이때 이름 옆에 예쁜 '샵 공식' 뱃지를 박아줍니다. / 실패: 빈 텍스트나 띄어쓰기만 입력하고 전송 버튼을 누르려 하면 버튼을 무시하거나 Disabled 처리해서 텅 빈 댓글을 막아주세요.
+- [버튼] 댓글 수정 -> PATCH /comments/{id} -> 성공: 수정 모드 입력창이 닫히며 고친 텍스트로 바로 업데이트합니다. / 실패: 사장님이 쓰지 않은 남의 댓글에는 애초에 이 수정/삭제 톱니바퀴 버튼이 렌더링되지 않도록 뷰를 잘 숨겨주세요.
+- [버튼] 댓글 삭제 -> DELETE /comments/{id} -> 성공: 해당 댓글 박스를 돔(DOM)에서 날려버리고 전체 댓글 카운트 숫자도 1 빼줍니다. / 실패: 실수로 지우지 않게 '정말 삭제할까요?'라는 네이티브 `confirm()`이나 커스텀 모달을 띄워줍니다.
 화면 상태:
-- tagged_snap: 내 샵이 태그된 게시물
-- shop_comment: author_type=shop 댓글로 표시
-- empty: 태그된 스네일 없음 안내
+- `tagged_snap`: 리스트에 뜨는 모든 게시물은 내 샵(shop_id)이 태그(tagged_shop_id)된 고마운 홍보물입니다. 디자인 시 사진을 큼직하게 살려주세요.
+- `shop_comment`: 일반 유저 댓글과 사장님이 단 댓글(`author_type=shop`)을 시각적으로 확 구분 지어 줘야 합니다. 사장님 프로필 테두리 색상을 다르게 하거나 특별한 왕관 뱃지를 달아주세요.
+- `empty`: 아직 우리 샵을 태그해준 유저가 없어서 텅 빈 상태. 사장님이 우울해하지 않게 귀여운 안내 문구와 이미지를 넣어주세요.
 QA 체크리스트:
-- [ ] 내 샵이 태그된 스네일만 보이는지 확인
-- [ ] 샵 댓글에 일반 유저와 다른 뱃지가 붙는지 확인
-- [ ] 내가 작성하지 않은 댓글에는 수정/삭제 버튼이 없는지 확인
-- [ ] MVP 제외인 신고 플로우가 화면에 노출되지 않는지 확인
+- [ ] 사장님 스네일 탭에 진입했을 때, 정말로 우리 샵이 태그된 게시물들만 정확하게 필터링되어 리스트에 올라오는지 테스트 데이터로 확인해주세요.
+- [ ] 사장님 계정으로 남긴 댓글을 렌더링할 때, 일반 유저들이 쓴 댓글들과 UI적으로 명확히 구분되는 '샵 공식 마크'가 잘 그려지는지 확인해주세요.
+- [ ] 남이 쓴 일반 댓글 영역을 호버(Hover)하거나 클릭했을 때, 실수로라도 수정/삭제 액션 버튼 뭉치가 보이지 않게 프론트 코드로 단단히 숨겼는지 체크해주세요.
 관련 필드: Snap.snap_id, Snap.author_user_id, Snap.caption, Snap.image_urls, Snap.tagged_shop_id, Snap.tagged_design_id, Snap.tagged_designer_id, Snap.like_count, Snap.comment_count, Snap.created_at, Comment.comment_id, Comment.snap_id, Comment.author_type, Comment.author_user_id, Comment.author_shop_id, Comment.content, Comment.created_at
 관련 API:
 - GET /owner/snaps : 내 단수 샵이 태그된 스네일 목록. 사장님 웹 전용
@@ -305,60 +322,59 @@ QA 체크리스트:
 ## 8. 대시보드
 요약: 오늘 예약 수, 신규 예약 요청 수, 미답변 리뷰 수, 최근 스네일 태그 수.
 구현 가이드:
-- 대시보드 4개 지표는 `/owner/dashboard/summary` 단일 API로 가져온다.
-- `today_reservation_count`는 `pending + payment_pending + confirmed`를 포함한다.
-- 각 지표 카드 클릭 시 이동할 화면과 필터 상태를 URL query 또는 라우터 state로 고정한다.
+- 대시보드 통합 API: 오늘 예약 수, 신규 요청, 미답변 리뷰, 최근 스네일 태그 등 대시보드의 4개 지표는 `/owner/dashboard/summary` 단일 API 한 방으로 가져와서 카드들을 채워주세요.
+- 오늘 예약 집계 기준: 화면의 '오늘 예약' 숫자는 확정된 것만 의미하지 않습니다. `pending(대기)`, `payment_pending(입금대기)`, `confirmed(확정)` 3가지 상태의 오늘 날짜 예약 건수가 모두 합산되어 내려갑니다.
+- 딥링크 라우팅 유지: 대시보드 카드를 클릭해서 다른 화면(예: 예약 화면)으로 넘어갈 때, URL query parameter나 Router state에 해당 필터 조건(예: status=pending)을 잘 넘겨줘서 새로고침을 하더라도 필터가 풀리지 않게 꽉 잡아주세요.
 체크포인트:
 - 4개 지표는 단일 API에서 내려주며 캐싱 TTL 60초 권장.
 - 각 지표 클릭 시 이동할 필터 상태를 프론트 라우팅에 맞춰 고정해야 함.
 API 호출 순서:
-- 대시보드 진입 시 `GET /owner/dashboard/summary`를 호출한다.
-- 카드 클릭 시 해당 기능 화면으로 이동하고 필요한 query filter를 붙인다.
-- 새 예약 요청 카드는 예약 화면 `status=pending`, 미답변 리뷰 카드는 리뷰 화면 `unanswered=true`로 이동한다.
+- [대시보드 진입]: 홈 화면(대시보드)에 뜨면 복잡하게 여러 API 부를 것 없이 쿨하게 `GET /owner/dashboard/summary` 단일 API 하나만 쏴서 숫자 4개를 다 받아옵니다.
+- [카드 라우팅]: 사장님이 4개의 지표 카드 중 하나를 누르면, 프론트엔드 라우터(Router)가 해당 페이지 경로로 이동시키면서 필수적인 필터 조건(Query params)을 뒤에 꼬리표처럼 달아줍니다.
+- [예시]: '새 예약 요청 3건' 카드를 눌렀다면 라우터는 `/reservations?status=pending` 경로로 푸시하고, '미답변 리뷰' 카드는 `/reviews?unanswered=true`로 쏴줍니다.
 버튼/이벤트 처리:
-- 오늘 예약 카드 -> 라우팅 -> 성공: 예약 화면 오늘 날짜 필터 / 실패: 데이터 0건이면 빈 상태
-- 신규 예약 요청 카드 -> 라우팅 -> 성공: 예약 화면 pending 필터 / 실패: 필터가 URL에 남는지 확인
-- 미답변 리뷰 카드 -> 라우팅 -> 성공: 리뷰 화면 unanswered=true / 실패: 답변 후 숫자 갱신
-- 최근 스네일 카드 -> 라우팅 -> 성공: 스네일 화면 이동 / 실패: 목록 빈 상태 표시
+- [카드 클릭] 오늘 예약 O건 -> 화면 라우팅 이동 -> 성공: 예약 관리 달력 화면으로 넘어가면서, 달력이 오늘 날짜로 포커싱되고 오늘 스케줄 리스트가 쫙 펼쳐집니다. / 실패: 오늘 건이 0건이면 예약 화면 자체에서 빈 상태 UI를 잘 보여주면 됩니다.
+- [카드 클릭] 신규 예약 요청 O건 -> 화면 라우팅 이동 -> 성공: 예약 화면으로 넘어가면서 상단 필터가 '수락 대기(pending)' 상태로 탁 눌려있게 세팅합니다. / 실패: 브라우저 뒤로 가기나 새로고침을 해도 URL에 `status=pending`이 남아있어서 필터가 안 풀리는지 유심히 체크하세요.
+- [카드 클릭] 미답변 리뷰 O건 -> 화면 라우팅 이동 -> 성공: 리뷰 관리 화면으로 넘어가면서 탭이 '미답변'으로 맞춰져 있도록 렌더링합니다. / 실패: 거기서 답변을 달고 다시 대시보드로 돌아왔을 때, 숫자 카운트가 즉시 깎여서 갱신되어 있는지 캐시 무효화를 신경 써주세요.
+- [카드 클릭] 최근 스네일 태그 -> 화면 라우팅 이동 -> 성공: 내 샵이 태그된 스네일 탭으로 쓱 넘겨줍니다. / 실패: 목록에 진짜 태그가 0개면 스네일 탭 안에서 빈 화면 안내를 보여줍니다.
 화면 상태:
-- loading: 카드 skeleton 표시
-- loaded: 4개 지표 표시
-- empty_zero: 0도 정상 수치로 표시
+- `loading`: 대시보드 API를 쏴서 숫자 4개를 기다리는 찰나의 순간. 뼈대만 있는 스켈레톤(Skeleton) UI나 펄스(Pulse) 애니메이션으로 카드를 예쁘게 흔들어주세요.
+- `loaded`: API가 도착해서 카운트 숫자가 딱 박힌 듬직한 화면. 카드가 클릭 가능해집니다.
+- `empty_zero`: 0이라는 숫자도 비정상이 아니라 당당한 데이터입니다. 에러처럼 보이지 않게 깔끔하게 '0건'이라고 그려주세요.
 QA 체크리스트:
-- [ ] 대시보드 API 한 번으로 4개 카드가 모두 채워지는지 확인
-- [ ] 카드 클릭 시 올바른 필터가 적용되는지 확인
-- [ ] 새로고침해도 필터 상태가 유지되는지 확인
-- [ ] API 실패 시 카드별 공통 오류 상태가 보이는지 확인
+- [ ] 네트워크 탭을 열어서, 대시보드 화면 렌더링을 위해 정말로 `/owner/dashboard/summary` API 단 하나만 아주 가볍게 호출하고 끝나는지 확인해주세요.
+- [ ] 카드별로 클릭해서 넘어간 다음 화면(예약, 리뷰 등)에 진입했을 때, 사장님이 기대했던 대로 필터(수락 대기, 미답변 등)가 자동으로 착 켜져 있는지 직접 눌러가며 테스트하세요.
+- [ ] 카드 클릭해서 넘어갔다가 브라우저 F5(새로고침) 버튼을 빡 눌렀을 때, 필터 상태가 멍청하게 리셋되지 않고 URL 상태를 읽어서 끈질기게 필터를 유지하는지 꼼꼼히 점검해주세요.
+- [ ] 인터넷이 끊겼거나 백엔드 서버가 잠시 죽어서 API가 실패했을 때, 대시보드가 하얗게 터지지 않고 카드 안에 얌전하게 '데이터를 불러오지 못했습니다' 아이콘이 그려지는지 방어 코드(Error Boundary)를 체크하세요.
 관련 API:
 - GET /owner/dashboard/summary : 사장님 대시보드 홈 집계. 4개 지표를 한 번에 반환: today_reservation_count (오늘 pending+payment_pending+confirmed 합), pending_count (미처리 pen...
 
 ## 9. 알림
 요약: 카카오 알림톡, 사장님 웹 알림함, 미읽음 뱃지, 딥링크, 모두 읽음.
 구현 가이드:
-- 웹푸시는 MVP 제외다. 사장님 알림은 카카오 알림톡과 웹 알림함을 같이 사용한다.
-- 알림 클릭 시 `deeplink_target`으로 이동하고 즉시 단건 읽음 처리 API를 호출한다.
-- 카카오 발송 실패와 무관하게 `OwnerNotification`은 남아야 하므로 알림함을 신뢰 가능한 백업 채널로 다룬다.
+- 알림 채널 전략: MVP에서는 브라우저 웹푸시(Web Push) 알림을 지원하지 않습니다. 대신 유저의 카카오 알림톡으로 발송하며, 동시에 웹 알림함(inbox)에 데이터를 차곡차곡 쌓아줍니다. 알림함 종모양 아이콘을 메인 채널로 구성해주세요.
+- 읽음 처리 + 이동 동기화: 유저가 새 알림을 클릭하면, 먼저 `PATCH /owner/notifications/{id}/read` API를 찔러 읽음 처리를 한 직후에, 알림 데이터에 있는 `deeplink_target` URL로 즉시 이동시켜주세요.
+- 알림함의 역할: 가끔 카카오 발송이 실패하더라도 웹 알림함 데이터는 무조건 생성되므로(신뢰성 100%), 사장님이 놓치는 일이 없도록 알림함 UI를 직관적으로 만들어주세요.
 체크포인트:
 - 웹푸시는 MVP 제외. 카카오 알림톡 + 웹 알림함 조합.
 - 알림 클릭 시 딥링크 이동과 읽음 처리가 함께 필요.
 API 호출 순서:
-- 알림함 진입 시 `GET /owner/notifications?cursor=`를 호출한다.
-- 상단 뱃지는 `GET /owner/notifications/unread-count`를 호출해 표시한다.
-- 알림 클릭 시 먼저 `PATCH /owner/notifications/{notification_id}/read`를 호출하고 `deeplink_target`으로 이동한다.
-- 모두 읽음은 `POST /owner/notifications/read-all`을 호출한 뒤 unread count를 0으로 갱신한다.
+- [알림 팝오버 열기]: 우측 상단 종모양을 눌러 알림함을 열 때 무한 스크롤용 `GET /owner/notifications?cursor=` API를 호출해서 리스트를 깔아줍니다.
+- [빨간 뱃지 갱신]: 화면 상단 종 아이콘 위 붉은 숫자 뱃지는 주기적으로 `GET /owner/notifications/unread-count`를 찔러서 안 읽은 갯수만 가볍게 그려냅니다.
+- [알림 클릭 이벤트]: 개별 알림을 톡 누르면 제일 먼저 `PATCH /owner/notifications/{id}/read`를 눈썹 휘날리게 쏴서 읽음 처리를 시킨 후, 알림 객체에 담겨있던 `deeplink_target` URL 주소로 사장님을 텔레포트 시켜줍니다.
+- [모두 읽음 빗자루질]: '모두 읽음' 텍스트 버튼을 누르면 `POST /owner/notifications/read-all` API를 쏘고, 성공하자마자 뱃지 숫자를 0으로 확 날려버립니다.
 버튼/이벤트 처리:
-- 알림 클릭 -> PATCH read + 라우팅 -> 성공: 읽음 처리 후 관련 화면 이동 / 실패: 이동 대상이 없으면 알림 상세만 표시
-- 모두 읽음 -> POST /owner/notifications/read-all -> 성공: 모든 알림 읽음 상태 + 뱃지 0 / 실패: 실패 시 재시도 토스트
-- 더 보기 -> GET /owner/notifications?cursor= -> 성공: 다음 페이지 append / 실패: has_next=false면 버튼 숨김
+- [리스트 클릭] 알림 항목 선택 -> PATCH /owner/notifications/{id}/read API 직후 라우팅 -> 성공: 알림 백그라운드 색이 '안 읽음(푸르스름)'에서 '읽음(흰색)'으로 슥 바뀌고, 해당 예약/리뷰 상세 페이지로 바로 넘어갑니다. / 실패: 만약 deeplink_target이 빈 값이거나 갈 곳이 애매한 알림이라면 어디 안 넘어가고 그냥 읽음 처리 색깔만 바꿔주세요.
+- [버튼] 모두 읽음 -> POST /owner/notifications/read-all -> 성공: 리스트에 있는 모든 알림의 배경색을 읽음(흰색)으로 싹 바꾸고, 종 아이콘 위 숫자 뱃지를 떼버립니다. / 실패: 통신이 실패하면 '앗, 다 못 읽었어요' 류의 재시도 토스트를 띄우고 숫자 뱃지를 원복시켜줍니다.
+- [스크롤 하단] 더 보기 -> GET /owner/notifications -> 성공: 스크롤이 바닥에 닿으면 다음 페이지 분량의 알림들을 리스트 맨 아래에 자연스럽게 이어 붙여줍니다(append). / 실패: 백엔드가 `has_next=false`를 주면 스피너를 없애고 더이상 API 헛발질을 하지 못하게 꽉 막아주세요.
 화면 상태:
-- unread: 강조 표시 + 뱃지 카운트 포함
-- read: 일반 표시
-- empty: 알림 없음 안내
+- `unread`: 사장님이 아직 안 읽은 신선한 알림. 배경색을 옅은 파란색이나 회색으로 칠해주고, 종 모양에는 뱃지 카운트를 달아 유혹합니다.
+- `read`: 이미 읽어서 볼일 끝난 알림. 배경은 평범한 흰색으로 두고 글자 색상도 살짝 죽여줍니다(Dimmed).
+- `empty`: 알림이 태초부터 한 개도 없거나 필터를 잘못 먹인 상태. '아직 도착한 알림이 없어요' 일러스트를 귀엽게 박아줍니다.
 QA 체크리스트:
-- [ ] 읽지 않은 알림 클릭 후 뱃지 숫자가 줄어드는지 확인
-- [ ] deeplink_target이 예약/리뷰/스네일 화면으로 올바르게 이동하는지 확인
-- [ ] 모두 읽음 후 새로고침해도 읽음 상태가 유지되는지 확인
-- [ ] 카카오 실패와 무관하게 웹 알림함에는 알림이 남는지 확인
+- [ ] 시퍼런 '안 읽은 알림'을 하나 클릭했을 때, 상세 화면으로 넘어감과 동시에 우측 상단 뱃지 숫자가 -1 줄어드는지 실시간 동기화를 유심히 관찰해주세요.
+- [ ] 예약 취소 알림을 눌렀을 땐 '예약 상세 모달'로, 리뷰 알림을 눌렀을 땐 '해당 리뷰 카드'로 `deeplink_target`을 타고 쏙쏙 정확히 랜딩(텔레포트) 하는지 여러 케이스를 찔러보세요.
+- [ ] [모두 읽음]을 누르고 나서 F5(새로고침)를 빡 때려도, 여전히 종 아이콘 위에 빨간 뱃지가 안 생기고 얌전히 0인 상태를 유지하는지 끈질기게 테스트해주세요.
 관련 필드: OwnerNotification.notification_id, OwnerNotification.owner_id, OwnerNotification.type, OwnerNotification.title, OwnerNotification.body, OwnerNotification.deeplink_target, OwnerNotification.related_resource_type, OwnerNotification.related_resource_id, OwnerNotification.is_read, OwnerNotification.read_at, OwnerNotification.created_at, OwnerNotification.kakao_sent_at
 관련 API:
 - GET /owner/notifications : 사장님 알림함 목록 (최신순)
@@ -369,27 +385,26 @@ QA 체크리스트:
 ## 10. 미정 / 추가 확인 필요 항목
 요약: 프론트 명세의 미정 항목과 백엔드 의사결정 기록/체크리스트 연결.
 구현 가이드:
-- 미정 항목은 기능 구현 전에 `14.의사결정기록`으로 옮겨 상태를 관리한다.
-- 정책 수치가 필요한 항목은 API 필드보다 먼저 결정해야 프론트 validation과 에러 문구가 안정된다.
-- 결정이 바뀌면 `spec_text`를 먼저 수정하고 워크북/비주얼라이저를 재생성한다.
+- 미정 정책 발견 시 대처법: 화면을 짜다가 '이 부분은 정책이 없는데 어떻게 하지?' 싶은 부분이 나오면, 절대 프론트엔드 코드에 하드코딩해서 임의로 결정하지 마시고 백엔드/기획 팀원에게 의사결정을 요청해 주세요.
+- 결정 후 UI 반영: 정책 수치가 결정되면 백엔드가 먼저 API 명세와 이 문서를 재생성할 것입니다. 프론트엔드는 반드시 이 문서의 에러 문구나 글자수 제한 등을 기준으로 UI validation 로직을 수정해야 싱크가 틀어지지 않습니다.
 체크포인트:
 - 프론트 문서 하단 v1.1 확정 사항은 백엔드 decisions와 계속 동기화해야 함.
 - 미정 항목은 사라지지 않게 체크리스트 또는 의사결정 기록으로 옮겨 관리.
 API 호출 순서:
-- 구현 전 미정 항목을 `spec_text/14_decisions.md`와 `spec_text/15_checklist.md`에서 확인한다.
-- 미정 항목이 화면 구현에 영향을 주면 프론트 임의 결정 대신 백엔드/기획 확인을 요청한다.
-- 결정이 바뀌면 `python tools\build_all_collaboration_outputs.py`로 HTML과 AI 요약을 다시 생성한다.
+- [사전 합의 확인]: 프론트 코딩을 빡세게 시작하기 전에, 명세서 하단의 `spec_text/14_decisions.md`(의사결정)와 `15_checklist.md`(남은 할일)를 쓱 훑어봅니다.
+- [기획 핑퐁]: 미정 항목(예: 예약 취소 패널티 금액 등)이 프론트 UI 로직에 지대한 영향을 미칠 것 같으면, 내 맘대로 if문 짜지 말고 기획자나 백엔드 담당자 슬랙으로 핑을 쳐서 결정을 독촉하세요.
+- [문서 재생성]: 핑퐁이 끝나서 백엔드가 정책을 확정하고 파이썬 스크립트를 한 바퀴 돌리면(`build_all_collaboration_outputs.py`), 여러분이 보고 계신 이 HTML 문서와 AI 프롬프트용 텍스트가 마법처럼 촤라락 최신본으로 업데이트됩니다.
 버튼/이벤트 처리:
-- 미정 정책 발견 -> API 호출 없음 -> 성공: 결정 필요 목록에 기록 / 실패: 임의 구현 금지
-- 결정 반영 -> 문서 재생성 -> 성공: HTML/AI 요약 갱신 / 실패: Notion 링크 업데이트 여부 확인
+- [액션] 미정 정책 발견 -> API 호출 금지 -> 성공: 이 부분은 일단 TODO 주석으로 비워두거나 더미 컴포넌트로 대충 자리만 잡아둡니다. / 실패: 자체적으로 하드코딩해서 '3번 지각하면 강퇴' 같은 상상 로직을 박아두지 마세요. 나중에 치우기 힘듭니다.
+- [액션] 결정 사항 UI 반영 -> 최신 API 명세 적용 -> 성공: 새로 뽑힌 HTML이나 AI 요약본(`ai.txt`)을 커서(Cursor)나 코파일럿에 통째로 먹여서 짜달라고 합니다. / 실패: 백엔드가 노션(Notion)에 올려둔 공유 링크의 문서 버전이 최신 날짜로 바뀌었는지 꼭 확인하고 작업에 들어가세요.
 화면 상태:
-- open: 아직 결정 필요
-- decided: 구현 가능
-- changed: 기존 구현 영향 확인 필요
+- `open`: 기획팀도 백엔드도 아직 머리 싸매고 고민 중인 상태. 프론트는 이 부분 건드리지 말고 딴 거 먼저 만드세요.
+- `decided`: 드디어 결판이 나서 수치가 문서에 박힌 상태. 이제 프론트 구현 페달을 밟아도 좋습니다.
+- `changed`: 엎어진 정책. 기존에 이미 프론트 UI로 짜둔 게 있다면 그 컴포넌트 뜯어고쳐야 하니 영향도를 먼저 파악하세요.
 QA 체크리스트:
-- [ ] 미정 정책이 코드에 하드코딩되지 않았는지 확인
-- [ ] 결정 변경 후 관련 화면의 버튼/문구/API 호출이 함께 바뀌었는지 확인
-- [ ] HTML과 AI 요약을 재생성해 Notion 링크가 최신인지 확인
+- [ ] 우리 프론트엔드 소스코드 전역 검색을 돌렸을 때, 미정이었던 정책 수치(예: 7일 전 100% 환불 등)가 하드코딩 상수(const)로 억지로 박혀있는 곳이 없는지 매의 눈으로 확인해주세요.
+- [ ] 기획자가 정책을 슥 바꿨다고 했을 때, 냅다 코드부터 치지 말고 관련된 팝업 문구, 확인 버튼 상태, API Payload 모양새까지 패키지로 잘 바뀌었는지 흐름 전체를 챙겨주세요.
+- [ ] 우리가 보고 있는 이 HTML 문서와 AI 요약본 파일의 생성 시각(우측 상단 메타데이터)이 최신 날짜로 잘 찍혀있는지 한 번만 확인하고 코딩을 시작합시다.
 
 프론트 구현 요청 방식:
 - 화면 진입 시 호출 API, 버튼 클릭 시 호출 API, 성공 후 화면 변화, 실패 시 문구를 먼저 정리한 뒤 구현합니다.

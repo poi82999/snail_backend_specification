@@ -24,212 +24,211 @@ SHARED_AI_TEXT_PATH = DOCS_DIR / "llm_pipeline_backend_index.ai.txt"
 
 
 EASY_FIELD_EXPLANATIONS = {
-    "visibility": "이 디자인이나 샵을 고객에게 보여줄지 정하는 공개 상태입니다. draft는 임시저장, active는 공개, hidden은 숨김입니다.",
-    "ai_analysis_status": "AI 분석이 어디까지 진행됐는지 보여주는 전체 상태입니다. 사장님 화면의 '분석 중/완료/실패' 표시 기준이 됩니다.",
-    "ai_analysis_started_at": "AI 분석이 시작된 시각입니다. 분석이 오래 걸릴 때 몇 분째 처리 중인지 보여주는 데 씁니다.",
-    "ai_analysis_completed_at": "AI 분석이 끝난 시각입니다. 성공뿐 아니라 최종 실패 시각을 남길 때도 씁니다.",
-    "image_id": "이미지 한 장을 구분하는 고유 번호입니다. LLM 결과가 어느 이미지의 결과인지 맞추는 열쇠입니다.",
-    "original_url": "사장님이 처음 올린 원본 사진의 저장 위치입니다. 나중에 재분석할 수 있도록 보관합니다.",
-    "cropped_url": "LLM이 원본에서 손톱 부분만 잘라 만든 이미지의 저장 위치입니다. Classify 단계와 썸네일에 사용됩니다.",
-    "ai_transform_status": "원본 사진에서 손톱 영역을 잘라내는 1단계가 성공했는지 실패했는지 나타냅니다.",
-    "ai_classify_status": "잘라낸 이미지를 보고 태그와 색상을 뽑는 2단계가 성공했는지 실패했는지 나타냅니다.",
-    "ai_tags": "LLM이 표준 태그 사전에서 골라준 디자인 태그입니다. 고객 검색과 필터에 직접 영향을 줍니다.",
-    "ai_color_palette": "LLM이 판단한 대표 색상 목록입니다. 색상 필터와 추천에 사용됩니다.",
-    "ai_style_category": "LLM이 판단한 디자인의 큰 스타일 분류입니다. 예: simple, glamour, trendy.",
-    "owner_tags": "사장님이 직접 입력한 자유 태그입니다. LLM 태그와 별도로 보관해서 사장님 의도를 검색에 반영합니다.",
+    "visibility": "사장님이 고객에게 샵/디자인을 보여줄지 숨길지 직접 토글하는 스위치 상태입니다. (임시저장 draft, 노출 active, 숨김 hidden)",
+    "ai_analysis_status": "현재 AI가 어디까지 분석했는지 나타내는 가장 중요한 필드입니다. 화면에 '분석 중 / 분석 완료 / 실패' 배지를 띄우는 기준이 됩니다.",
+    "ai_analysis_started_at": "분석이 시작된 시간입니다. 빙글빙글 도는 로딩 화면에서 'n분째 분석 중입니다'라고 친절하게 알려줄 때 씁니다.",
+    "ai_analysis_completed_at": "분석이 끝난(성공이든 실패든) 시간입니다. 얼마나 걸렸는지 기록하거나 에러 발생 시점을 파악할 때 유용합니다.",
+    "image_id": "디자인에 올라간 여러 장의 사진 중 딱 1장을 콕 집어내는 고유 번호입니다. 백엔드와 LLM이 서로 '이 사진 말이야'라고 소통할 때 씁니다.",
+    "original_url": "사장님이 처음 업로드한 쌩원본 사진의 링크입니다. 나중에 AI가 잘못 분석해서 다시 처음부터 재분석해야 할 때 꺼내 씁니다.",
+    "cropped_url": "AI(Transform)가 원본에서 손톱 영역만 예쁘게 오려낸 썸네일 이미지 링크입니다. 고객 검색 화면이나 2차 AI 분석(Classify)에 들어갑니다.",
+    "ai_transform_status": "1단계 AI(손톱 오려내기) 작업의 성공/실패 여부입니다.",
+    "ai_classify_status": "2단계 AI(태그/색상 추출) 작업의 성공/실패 여부입니다.",
+    "ai_tags": "AI가 우리 서비스의 '표준 태그 사전'에서만 쏙쏙 골라낸 검색용 태그들입니다. 프론트 필터 칩스와 100% 일치해야 합니다.",
+    "ai_color_palette": "AI가 뽑아낸 대표 컬러들입니다. '핑크톤 모아보기' 같은 색상 필터 검색의 핵심 무기입니다.",
+    "ai_style_category": "전체적인 무드(러블리, 힙한, 심플 등)를 분류해둔 큰 카테고리입니다.",
+    "owner_tags": "AI 분석과 무관하게, 사장님이 굳이 덧붙이고 싶어 하는 자유 키워드(해시태그) 배열입니다."
 }
 
 
 EASY_CONTRACT_FIELD_EXPLANATIONS = {
-    "image_id": "백엔드와 LLM이 같은 이미지를 가리키기 위해 쓰는 고유 번호입니다.",
-    "image_url": "LLM이 내려받아 분석할 이미지 파일 주소입니다.",
-    "callback_url": "LLM 작업이 끝났을 때 결과를 되돌려줄 백엔드 주소입니다.",
-    "options.output_size": "잘라낸 이미지의 목표 크기입니다. 예: 1080x1080.",
-    "options.background": "잘라낸 이미지의 배경 처리 방식입니다. 예: 투명 배경.",
-    "status": "작업 성공 여부입니다. success면 성공, failed면 실패입니다.",
-    "cropped_image_url": "Transform 결과로 만들어진 손톱 영역 이미지 주소입니다.",
-    "cropped_image_size": "Transform 결과 이미지의 실제 크기입니다.",
-    "confidence": "Transform 결과를 모델이 얼마나 확신하는지 나타내는 점수입니다.",
-    "nail_count_detected": "사진에서 감지한 손톱 개수입니다.",
-    "processing_time_ms": "LLM 작업에 걸린 시간입니다. 밀리초 단위입니다.",
-    "error_code": "실패했을 때 실패 이유를 기계가 읽을 수 있게 정한 코드입니다.",
-    "error_message": "실패했을 때 사람이 읽을 수 있는 상세 설명입니다.",
-    "locale": "결과 언어와 지역 기준입니다. 한국 서비스는 ko_KR을 사용합니다.",
-    "options.max_tags": "LLM이 최대 몇 개의 태그를 돌려줄지 정합니다.",
-    "options.include_color_palette": "대표 색상도 함께 받을지 정합니다.",
-    "options.include_style_category": "큰 스타일 분류도 함께 받을지 정합니다.",
-    "tags": "검색에 사용할 디자인 태그 목록입니다. 반드시 표준 태그 사전 안의 값이어야 합니다.",
-    "color_palette": "디자인의 대표 색상 목록입니다.",
-    "style_category": "디자인의 큰 스타일 분류입니다.",
-    "nail_shape": "손톱 모양입니다. 현재 백엔드 저장 필드 추가 여부는 별도 결정이 필요합니다.",
-    "confidence_overall": "Classify 결과 전체를 모델이 얼마나 확신하는지 나타내는 점수입니다.",
+    "image_id": "어떤 이미지를 처리할지 백엔드와 AI가 맞추는 주민번호 같은 고유 키입니다.",
+    "image_url": "AI 모듈이 다운로드 받아서 분석을 시작할 원본 사진의 주소입니다.",
+    "callback_url": "비동기로 작업하는 AI가 '분석 다 끝났어요!'라고 백엔드에게 결과를 던져줄 도착지 주소입니다.",
+    "options.output_size": "잘라낼 손톱 썸네일을 가로세로 몇 픽셀로 맞출지 지정합니다. (예: 1080x1080)",
+    "options.background": "잘라낸 손톱 이미지 뒷배경을 투명하게 날릴지, 단색으로 채울지 정하는 옵션입니다.",
+    "status": "AI 작업의 최종 명운. `success`(성공) 아니면 `failed`(실패) 둘 중 하나만 내려옵니다.",
+    "cropped_image_url": "1단계(Transform)를 무사히 마치고 저장소에 업로드된 예쁜 손톱 썸네일 주소입니다.",
+    "cropped_image_size": "실제로 오려진 썸네일 이미지의 최종 해상도입니다.",
+    "confidence": "AI가 자기 분석 결과에 얼마나 자신 있는지 나타내는 확신도 점수(0~1)입니다. 너무 낮으면 차라리 실패 처리합니다.",
+    "nail_count_detected": "사진에서 감지된 손톱의 개수입니다. (예: 0개면 손톱이 없는 사진이라 에러 뱉음)",
+    "processing_time_ms": "AI가 끙끙대며 분석한 시간입니다. 1000이 1초입니다.",
+    "error_code": "실패 시 기계가 쉽게 읽고 프론트 분기 처리를 할 수 있는 텍스트 코드입니다. (예: NO_NAIL)",
+    "error_message": "실패 시 사람이 읽을 수 있는 친절한 설명입니다.",
+    "locale": "결과물을 무슨 언어로 줄지 묻는 옵션. 한국 서비스니까 무조건 `ko_KR`을 씁니다.",
+    "options.max_tags": "AI한테 '태그 너무 많이 주지 말고 딱 N개만 뽑아줘'라고 제한을 거는 설정입니다.",
+    "options.include_color_palette": "결과물에 대표 색상도 같이 내려줄지 물어보는 옵션입니다.",
+    "options.include_style_category": "큰 스타일 분류 값도 같이 내려줄지 물어보는 옵션입니다.",
+    "tags": "프론트 필터링에 쓰일 귀중한 태그 리스트입니다. 무조건 우리가 약속한 단어(사전)만 와야 합니다.",
+    "color_palette": "디자인의 대표 색상 헥스코드나 색상명 배열입니다.",
+    "style_category": "디자인의 큼직한 분위기(심플, 화려함 등)를 뜻합니다.",
+    "nail_shape": "라운드, 스퀘어 등 손톱의 생김새입니다.",
+    "confidence_overall": "2단계(Classify) 전체 결과에 대한 AI 스스로의 종합 자신감 점수입니다."
 }
 
 
 EASY_API_EXPLANATIONS = {
-    "POST /owner/designs": "사장님이 새 디자인을 등록하는 버튼과 연결됩니다. 화면은 바로 등록 완료로 넘어가고, AI 분석은 뒤에서 따로 진행됩니다.",
-    "GET /owner/designs": "사장님이 내 디자인 목록을 볼 때 사용합니다. 분석 중, 분석 실패, 숨김 같은 탭을 만들 때 필요합니다.",
-    "GET /owner/designs/{design_id}": "디자인 하나의 상세 정보와 AI 분석 상태를 확인할 때 사용합니다.",
-    "PATCH /owner/designs/{design_id}": "디자인 제목, 가격, 소요 시간, 태그 같은 정보를 수정할 때 사용합니다.",
-    "POST /owner/designs/{design_id}/images": "기존 디자인에 사진을 추가할 때 사용합니다. 사진이 바뀌면 AI 분석도 다시 시작됩니다.",
-    "DELETE /owner/designs/{design_id}/images/{image_id}": "디자인 사진을 삭제할 때 사용합니다. 사진이 바뀌므로 AI 분석이 다시 필요할 수 있습니다.",
-    "POST /owner/designs/{design_id}/reanalyze": "분석이 실패했거나 다시 분석하고 싶을 때 누르는 '재분석' 버튼과 연결됩니다.",
+    "POST /owner/designs": "[디자인 등록하기 버튼] 사장님이 폼을 채워 저장을 누를 때 호출합니다. 쏘자마자 프론트는 성공 화면으로 넘어가지만, 뒤에선 AI가 땀 뻘뻘 흘리며 분석을 시작합니다.",
+    "GET /owner/designs": "[디자인 목록 보기] 사장님이 자기 포트폴리오를 볼 때 씁니다. 상태별(분석중, 완료, 실패) 탭이나 필터를 구현할 때 쿼리를 적극 활용하세요.",
+    "GET /owner/designs/{design_id}": "[디자인 상세 뷰] 디자인 하나를 눌렀을 때, 혹은 AI가 분석을 끝냈는지 실시간으로 새로고침(폴링)해서 뱃지를 갈아끼울 때 호출합니다.",
+    "PATCH /owner/designs/{design_id}": "[디자인 텍스트 수정] 사진은 놔두고 제목이나 가격, 태그만 슥 고칠 때 가볍게 호출하는 API입니다.",
+    "POST /owner/designs/{design_id}/images": "[새 사진 끼워넣기] 사진을 새로 올리면 원본이 바뀌므로, 얌전히 '분석 중' 뱃지로 원복하고 AI에게 다시 일감을 던집니다.",
+    "DELETE /owner/designs/{design_id}/images/{image_id}": "[사진 삭제하기] 사진을 지워도 전체 디자인의 분위기가 바뀔 수 있어 AI 분석이 다시 돌아갈 수 있습니다.",
+    "POST /owner/designs/{design_id}/reanalyze": "[수동 재분석 버튼] AI가 사진을 엄한 걸로 인식해서 실패(failed) 떴을 때, 억울한 사장님이 다시 분석해달라고 찌르는 버튼입니다."
 }
 
 
 STEP_PLAIN_LANGUAGE = {
     "flow": [
-        "사장님이 디자인 사진을 올리면 백엔드는 먼저 저장만 하고 화면에 빠르게 응답합니다.",
-        "그 뒤 백엔드가 LLM에게 사진 분석을 맡기고, LLM 결과가 돌아오면 디자인의 검색 태그와 노출 가능 상태를 업데이트합니다.",
-        "즉, 사장님이 등록 버튼을 누르는 일과 AI 분석이 끝나는 일은 같은 순간에 일어나지 않습니다.",
+        "사장님이 디자인 사진을 올리고 [등록]을 쾅 누르면, 백엔드는 일단 '알겠어요!' 하고 바로 화면을 응답해줍니다.",
+        "그러고 나서 백엔드가 몰래 AI(LLM)에게 사진 분석을 맡기는데, AI가 곰곰이 생각해서 정답을 돌려주면 그제야 디자인에 예쁜 태그가 붙고 유저들에게 보일 준비가 끝납니다.",
+        "즉, 등록 버튼을 누른 찰나에 모든 분석이 끝나는 게 아니니, 프론트엔드는 반드시 사장님께 '현재 ⏳AI 분석 중입니다'라는 뱃지를 친절하게 띄워주며 기다리게 해야 합니다."
     ],
     "transform": [
-        "Transform은 원본 사진에서 손톱 부분만 보기 좋게 잘라내는 단계입니다.",
-        "이 단계가 성공해야 다음 Classify 단계에서 색상과 스타일을 안정적으로 판단할 수 있습니다.",
-        "실패하면 태그 분석으로 넘어가지 않고, 사장님에게 사진을 다시 올리거나 재분석하라는 동선을 보여줘야 합니다.",
+        "Transform 단계는 한마디로 '원룸 배경, 사장님 손가락 등을 싹 다 날리고 오직 예쁜 손톱만 네모 반듯하게 오려내는(Crop) 단계'입니다.",
+        "이 1단계 오려내기가 완벽해야 다음 2단계에서 색상이나 스타일을 안 틀리고 잘 잡을 수 있습니다.",
+        "만약 이 단계부터 '이건 손톱이 아닌데?(NO_NAIL)' 하고 실패해버리면 2단계로 넘어가지 말고, 프론트에서 재빨리 사장님께 '사진에 손톱이 안 보여요 ㅠㅠ 교체해주세요'라고 안내해야 합니다."
     ],
     "classify": [
-        "Classify는 잘라낸 손톱 이미지를 보고 검색에 필요한 태그와 색상을 붙이는 단계입니다.",
-        "LLM이 아무 단어나 만들면 검색 필터와 맞지 않으므로, 정해진 표준 태그 사전 안에서만 골라야 합니다.",
-        "이 결과가 고객이 '핑크', '프렌치', '봄' 같은 조건으로 검색할 때 사용됩니다.",
+        "Classify 단계는 1단계에서 예쁘게 오려낸 손톱만 보고 '이건 핑크톤에 글리터가 들어갔군' 하며 검색용 태그와 색상을 찰떡같이 붙여주는 단계입니다.",
+        "이때 AI가 신나서 아무 단어나 창조하면 안 되고, 반드시 우리가 미리 짜둔 '표준 태그 사전' 안에서만 단어를 골라야 고객 앱 필터링 칩스와 아귀가 딱 맞습니다.",
+        "프론트엔드는 여기서 내려온 `ai_tags`를 고객 앱의 검색 필터 버튼으로 100% 매핑해서 뿌려주면 됩니다."
     ],
     "errors": [
-        "LLM 실패는 단순 서버 오류뿐 아니라 사진 품질 문제일 수도 있습니다.",
-        "백엔드는 실패 코드를 보고 사장님에게 '다시 촬영', '재분석', '잠시 후 재시도' 중 어떤 안내를 보여줄지 결정합니다.",
-        "같은 failed라도 원인별로 다음 행동이 달라야 화면이 친절해집니다.",
+        "AI 분석 실패는 단순히 서버가 죽은 게 아니라, 사장님이 실수로 발가락이나 풍경 사진을 올려서 못 알아보는 경우도 많습니다.",
+        "백엔드가 친절하게 내려주는 `error_code`를 프론트에서 찰떡같이 캐치해서, '사진이 너무 흐려요(LOW_QUALITY)'인지 '손톱이 없어요(NO_NAIL)'인지 팝업 텍스트를 다르게 띄워주세요.",
+        "같은 실패라도 원인에 따라 사장님한테 [재분석하기] 버튼을 줄지, [사진 아예 바꾸기] 버튼을 줄지 다르게 렌더링하는 게 핵심입니다."
     ],
     "dictionary": [
-        "표준 태그 사전은 LLM이 사용할 수 있는 단어 목록입니다.",
-        "이 목록 밖의 단어가 들어오면 고객 검색과 필터에서 빠질 수 있습니다.",
-        "태그를 추가하거나 이름을 바꾸면 LLM, 백엔드 검색, 프론트 필터를 함께 업데이트해야 합니다.",
+        "표준 태그 사전은 AI가 사용할 수 있는 '허락된 단어장'입니다.",
+        "만약 AI가 사전 밖의 단어를 뱉으면, 백엔드가 컷오프하거나 프론트 검색 칩스에 안 나타나게 되니 양쪽 모두 철저하게 이 사전을 기준으로 로직을 짭니다.",
+        "나중에 기획자가 '이제 시럽 네일 태그도 추가할까요?' 하면 백엔드/AI/프론트 셋 다 동시에 이 단어장을 업데이트해야 화면이 꼬이지 않습니다."
     ],
     "open-questions": [
-        "이 항목들은 코드를 짜기 전에 팀끼리 먼저 정해야 하는 운영 규칙입니다.",
-        "예를 들어 LLM 결과를 바로 받을지, 나중에 callback으로 받을지에 따라 백엔드 구조가 달라집니다.",
-        "이미지 저장 주체와 신뢰도 기준도 나중에 바꾸기 어려우므로 초기에 합의해야 합니다.",
-    ],
+        "여기 있는 질문들은 코딩 들어가기 전에 '어떻게 할까요?' 하고 기획/백엔드와 결판을 내야 하는 항목들입니다.",
+        "예를 들어 AI 분석이 오래 걸리는데 화면을 새로고침할 건지(동기), 아니면 나중에 팝업 띄울 건지(비동기 Webhook) 등에 따라 프론트 짜는 방식이 180도 바뀝니다.",
+        "따라서 헷갈리면 절대 마음대로 더미코드 짜지 마시고 핑을 쳐서 결정을 받아낸 뒤 UI에 반영해주세요."
+    ]
 }
 
 
 LLM_STEP_PLAYBOOKS = {
     "flow": {
         "call_order": [
-            "사장님이 디자인을 등록하면 백엔드는 원본 이미지를 저장하고 `ai_analysis_status=pending`으로 둔다.",
-            "백엔드 워커가 이미지별로 Transform 요청을 만든다.",
-            "Transform 성공 callback이 오면 `DesignImage.cropped_url`과 `ai_transform_status=done`을 저장한다.",
-            "Transform 성공 이미지에 대해 Classify 요청을 만든다.",
-            "Classify 성공 결과를 디자인 단위 태그/색상/스타일로 병합하고 `ai_analysis_status=done`으로 변경한다.",
-            "하나라도 최종 실패하면 실패 사유를 저장하고 사장님 화면에서 재분석/사진 교체 동선을 보여준다.",
+            "[최초 등록]: 사장님이 폼을 제출하면 백엔드는 쌩 원본 이미지를 스토리지에 올리고 상태를 `ai_analysis_status = pending(대기중)`으로 만듭니다.",
+            "[1단계 큐잉]: 백엔드 워커가 눈치껏 이미지 한 장 한 장마다 Transform(오려내기) 요청을 비동기 큐에 밀어 넣습니다.",
+            "[1단계 성공 시]: Transform 결과(크롭된 이미지)가 도착하면 그걸 저장하고, 바로 이어서 2단계 Classify(태그 추출) 요청을 큐에 던집니다.",
+            "[최종 성공 시]: Classify까지 정답이 오면 태그/컬러를 다 저장한 뒤 디자인의 최종 상태를 `ai_analysis_status = done(완료)`으로 쾅 찍어줍니다.",
+            "[에러 발생 시]: 1단계든 2단계든 어디서라도 엎어지면 그 즉시 분석을 중단하고 `failed(실패)` 상태와 에러 사유를 남깁니다."
         ],
         "events": [
-            ["디자인 등록됨", "Transform 큐 작업 생성", "원본 이미지별 작업 시작", "이미지 없음/URL 오류면 failed"],
-            ["Transform 완료", "Classify 큐 작업 생성", "cropped_url 저장 후 다음 단계 진행", "NO_NAIL 등 실패 코드는 Classify 생략"],
-            ["Classify 완료", "Design.ai_* 필드 업데이트", "검색 노출 조건 충족 가능", "태그 사전 외 값은 검증 실패"],
+            ["[시스템] 디자인 새로 등록됨", "Transform 큐 작업 시작", "프론트에서는 사장님께 'AI가 꼼꼼히 분석을 시작했어요 ⏳' 배지를 예쁘게 보여주며 달래줍니다.", "URL이 깨졌거나 용량이 0바이트면 애초에 큐에 안 넣고 즉각 failed 처리합니다."],
+            ["[시스템] 1단계 Transform 무사 통과", "Classify 큐 작업 바통 터치", "화면상엔 아직 '분석 중'으로 계속 유지됩니다 (사장님은 뒤에서 무슨 단계인지 모릅니다).", "손톱이 안 보여서 NO_NAIL 에러가 터졌다면, 2단계로 안 넘어가고 즉시 사장님 화면에 실패 딱지와 함께 [사진 교체] 안내를 띄웁니다."],
+            ["[시스템] 2단계 Classify 최종 합격", "Design.ai_* 데이터 꽉꽉 채움", "프론트 뱃지를 '분석 완료 ✅'로 갈아끼우고, 이제 드디어 사장님이 [고객에게 공개하기] 토글을 켤 수 있게 스위치 잠금을 풀어줍니다.", "만약 AI가 사전 밖의 단어를 마구 내뱉었다면 백엔드가 검증에서 컷하고 에러(failed)로 간주할 수 있습니다."]
         ],
         "qa": [
-            "디자인 등록 API 응답이 LLM 완료를 기다리지 않는지 확인",
-            "Transform 실패 시 Classify 요청이 생성되지 않는지 확인",
-            "Classify 완료 후 고객 검색 대상 조건이 `ai_analysis_status=done`으로 바뀌는지 확인",
-            "같은 callback이 2번 와도 DB 상태가 중복/오염되지 않는지 확인",
-        ],
+            "사장님이 [디자인 등록] 버튼을 눌렀을 때, AI 분석이 끝날 때까지 10초 넘게 멍때리며 로딩만 돌고 있지 않고 바로 화면이 넘어가 비동기로 처리되는지 확인하세요.",
+            "고의로 풍경 사진을 올려 1단계에서 NO_NAIL 실패가 떴을 때, 쓸데없이 2단계 태그 추출까지 안 돌아가고 재빨리 에러 팝업을 띄우는지 테스트하세요.",
+            "분석 중(pending)일 때는 고객용 앱에서 검색해도 절대 해당 디자인이 나오지 않다가, 완료(done)로 상태가 바뀌는 순간 검색 결과에 짠 하고 나타나는지 교차 검증해주세요.",
+            "같은 이미지를 연속해서 중복으로 등록 버튼을 광클했을 때 DB에 분석 결과나 크롭 이미지가 두 번씩 오염되어 쌓이지 않게 방어 로직이 튼튼한지 확인하세요."
+        ]
     },
     "transform": {
         "call_order": [
-            "백엔드가 `image_id`, `image_url`, `callback_url`, `options`를 담아 `/v1/transform`을 호출한다.",
-            "LLM은 `image_url`에서 원본을 다운로드한다.",
-            "손톱 영역을 감지하고 지정 크기로 crop/normalize한다.",
-            "cropped 이미지를 저장하고 `cropped_image_url`을 만든다.",
-            "성공/실패 결과를 동기 응답 또는 callback으로 백엔드에 돌려준다.",
+            "[AI 호출 시작]: 백엔드가 AI 모듈의 `/v1/transform` 엔드포인트를 찌르며 '이 원본 주소(image_url) 다운받아서 잘라줘, 다 되면 이 주소(callback_url)로 알려줘'라고 주문합니다.",
+            "[AI의 작업]: AI는 원본 사진을 쓱 훑어보고 손톱 위치를 기가 막히게 감지한 뒤, 1080x1080 등 약속된 예쁜 크기로 잘라내고(Crop) 기울기도 잡아줍니다.",
+            "[결과 저장]: 잘라낸 사진을 어딘가(S3 등)에 예쁘게 저장하고 최종 `cropped_image_url`을 뽑아냅니다.",
+            "[콜백 응답]: 백엔드에게 '나 다했어!'라며 성공 데이터나 명확한 에러 코드를 콜백으로 날려줍니다."
         ],
         "events": [
-            ["요청 수신", "image_url 다운로드", "처리 시작", "다운로드 실패면 INTERNAL_ERROR 또는 명확한 오류 반환"],
-            ["손톱 감지 성공", "cropped 이미지 생성", "success 응답", "confidence가 낮으면 실패 기준 적용"],
-            ["손톱 감지 실패", "failed 응답", "NO_NAIL/LOW_QUALITY 등 코드 반환", "error_code 누락 금지"],
+            ["[AI] 백엔드 요청 받음", "이미지 다운로드 시작", "정상 다운로드되면 룰루랄라 손톱을 찾기 시작합니다.", "서버가 잠시 죽었거나 URL이 404면 INTERNAL_ERROR 류의 에러 코드를 뱉고 바로 퇴근합니다."],
+            ["[AI] 손톱 기가막히게 감지함", "크롭 이미지 생성 및 저장", "기분 좋게 success 응답과 함께 확신도(confidence) 점수를 백엔드에 제출합니다.", "어렴풋이 보이긴 하는데 자신감(confidence)이 너무 낮으면 정책에 따라 매정하게 실패로 돌릴 수 있습니다."],
+            ["[AI] 사진에 손톱이 아예 없음", "failed 응답과 에러 뱉음", "얄짤없이 `NO_NAIL`, `LOW_QUALITY` 같은 명확한 코드와 함께 분석을 거부합니다.", "실패했는데 error_code가 빈 값으로 내려오는 대참사가 일어나면 안 됩니다."]
         ],
         "qa": [
-            "요청의 image_id가 응답에 그대로 돌아오는지 확인",
-            "NO_NAIL 사진 샘플에서 `status=failed`, `error_code=NO_NAIL`이 나오는지 확인",
-            "성공 응답에 cropped_image_url, cropped_image_size, confidence가 모두 있는지 확인",
-            "처리 시간이 10초 이상인 케이스에서 callback 방식이 끊기지 않는지 확인",
-        ],
+            "백엔드가 준 `image_id`를 AI가 콜백 응답에 잃어버리지 않고 고스란히 돌려주는지(매칭용) 꼭 확인하세요.",
+            "인터넷에서 다운받은 강아지 사진을 올렸을 때 정확하게 `status=failed`, `error_code=NO_NAIL`이 반환되고 프론트에 '손톱이 없어요' 문구가 뜨는지 테스트하세요.",
+            "성공했을 땐 크롭된 이미지 URL, 사이즈 정보, 확신도 점수 3종 세트가 모두 빠짐없이 내려오는지 콘솔을 찍어보세요.",
+            "사진이 너무 고화질이라 분석에 10초 넘게 걸려도 비동기 콜백 방식이 끊기거나 타임아웃 나지 않고 무사히 돌아오는지 긴장하며 확인하세요."
+        ]
     },
     "classify": {
         "call_order": [
-            "백엔드는 Transform 성공 이미지의 `cropped_url`을 `image_url`로 넣어 `/v1/classify`를 호출한다.",
-            "LLM은 이미지를 분석해 태그, 색상, 스타일, 손톱 모양 후보를 만든다.",
-            "후보 값을 표준 태그 사전 값으로 매핑한다.",
-            "사전에 없는 값은 버리거나 가장 가까운 표준값으로 치환한다.",
-            "백엔드는 결과를 `Design.ai_tags`, `Design.ai_color_palette`, `Design.ai_style_category`에 저장한다.",
+            "[AI 호출 시작]: 1단계를 통과한 예쁜 크롭 이미지(cropped_url)를 가지고, 백엔드가 이번엔 `/v1/classify`에 들이밀며 '태그 좀 달아줘'라고 요청합니다.",
+            "[특징 추출]: LLM(비전 모델)이 이미지를 째려보며 '음, 이건 핑크베이스에 큐빅이 박혔고 분위기는 러블리하군' 하며 태그 후보들을 마구 떠올립니다.",
+            "[사전 필터링]: LLM 스스로 방금 떠올린 단어들을 우리가 정해둔 '표준 태그 사전'과 대조해서 똑같은 단어들만 살아남게 매핑합니다.",
+            "[비표준 컷오프]: 사전에 없는 기상천외한 단어는 가차 없이 버리거나, 제일 비슷한 표준 단어로 억지로 끼워 맞춥니다.",
+            "[최종 저장]: 정제된 태그, 컬러, 스타일 결과가 백엔드로 넘어오면 프론트가 읽기 좋게 `Design` 테이블에 쏙쏙 박아넣습니다."
         ],
         "events": [
-            ["분류 성공", "표준 태그 매핑", "success 응답", "사전 외 태그가 있으면 백엔드 검증 실패"],
-            ["신뢰도 낮음", "confidence 기준 적용", "failed 또는 낮은 태그 제외", "기준 미확정이면 백엔드와 논의"],
-            ["여러 이미지 결과", "태그 병합 정책 적용", "디자인 단위 결과 저장", "병합 정책 없으면 임의 결정 금지"],
+            ["[AI] 분류 성공 및 매핑 완료", "success 콜백 전송", "결과에 표준 단어들만 예쁘게 배열로 담겨 백엔드에 도착합니다.", "만약 이 배열에 우리가 모르는 사투리(?) 태그가 들어있으면 백엔드가 500 에러를 뱉고 화를 냅니다."],
+            ["[AI] 뭔지 잘 모르겠음 (확신도 낮음)", "confidence 임계치 적용", "확신이 안 서는 태그는 덜어내거나 통째로 failed 처리합니다.", "어디서 컷할지 기준(예: 0.7 이하면 버린다)이 미정이면 프론트는 일단 로직을 비워두고 기획을 쪼세요."],
+            ["[시스템] 여러 사진에서 태그 나옴", "태그 병합(Merge) 로직", "사진이 3장이면 각 사진의 태그들을 모아서 중복을 제거하고 디자인 하나의 통합 태그로 만듭니다.", "병합 규칙 없이 아무거나 덮어쓰면 안 되니 로직을 꼭 확인하세요."]
         ],
         "qa": [
-            "tags/color_palette/style_category가 표준 사전 안의 값만 반환되는지 확인",
-            "nail_shape를 저장할지 표시만 할지 정책이 문서와 맞는지 확인",
-            "max_tags=5 요청에서 tags가 5개를 넘지 않는지 확인",
-            "잘못된 이미지 URL에서 명확한 failed 응답이 오는지 확인",
-        ],
+            "`tags`, `color_palette`, `style_category` 배열 안에 들어온 값들이 100% 빠짐없이 우리의 '표준 태그 사전'에 등재된 녀석들인지 깐깐하게 대조해보세요.",
+            "`nail_shape`(손톱 모양) 값도 같이 내려오긴 하는데, 이걸 화면에 그릴 건지 DB에 짱박을 건지 정책 문서(decisions)랑 로직이 찰떡같이 맞는지 확인하세요.",
+            "백엔드가 `max_tags=5`로 5개만 달라고 제한을 걸었는데 눈치 없는 AI가 6개를 뱉어내진 않는지 제한(Limit) 테스트를 돌려보세요.",
+            "이미지 URL이 중간에 깨졌거나 404일 때, AI가 무한정 뻗어있지 않고 명확한 failed 콜백을 신속하게 쏴주는지 확인하세요."
+        ]
     },
     "errors": {
         "call_order": [
-            "LLM은 실패 시 항상 `status=failed`, `error_code`, `error_message`를 반환한다.",
-            "백엔드는 error_code를 사장님 안내 문구로 변환한다.",
-            "재시도 가능한 오류와 사용자 조치가 필요한 오류를 구분한다.",
-            "최종 실패 시 디자인 또는 이미지 상태를 failed로 저장하고 재분석 버튼을 노출한다.",
+            "[AI 실패 발생]: 어떤 이유로든 실패하면 AI는 `status=failed`, `error_code`, `error_message` 3형제를 무조건 챙겨서 콜백을 줍니다.",
+            "[메시지 번역]: 백엔드는 영어로 된 딱딱한 error_code를 받아서, 프론트엔드가 사장님께 보여주기 좋은 부드러운 안내 문구로 번역해 넘겨줍니다.",
+            "[에러 분기 1]: '사진이 흐려요', '손톱이 없어요' 류는 시스템 잘못이 아니니 사장님께 [사진 다시 올리기]를 강권합니다.",
+            "[에러 분기 2]: 'AI 서버 접속 끊김' 류는 억울하니까 백엔드가 몰래 재시도(Retry)를 몇 번 돌려보고, 그래도 안 되면 최종 failed 처리와 함께 [재분석] 버튼을 띄웁니다."
         ],
         "events": [
-            ["NO_NAIL/LOW_QUALITY", "사용자 조치 필요", "재촬영 안내", "자동 재시도보다 사진 교체 우선"],
-            ["INTERNAL_ERROR", "시스템 오류", "자동 재시도 후보", "재시도 횟수 초과 시 failed"],
-            ["INAPPROPRIATE", "콘텐츠 차단", "업로드 불가 안내", "재시도하지 않음"],
+            ["[에러] NO_NAIL / LOW_QUALITY", "사용자 조치 필요 모드 전환", "사장님 화면에 '사진을 너무 멀리서 찍었거나 손톱이 안 보여요. 다른 사진을 올려주세요'라고 친절히 띄웁니다.", "이 상황에선 자동 재시도해봤자 똑같으니 백엔드 리소스 낭비하지 마세요."],
+            ["[에러] INTERNAL_ERROR", "백엔드 몰래 자동 재시도", "일단 사장님한텐 계속 '분석 중 ⏳'으로 뻥을 치면서 뒤에선 다시 AI를 찔러봅니다.", "3번 찔러도 안 되면 그제야 뱃지를 '분석 실패 🚨'로 바꾸고 눈물을 머금고 수동 재분석 버튼을 띄웁니다."],
+            ["[에러] INAPPROPRIATE", "유해 콘텐츠 차단 모드", "욕설, 야한 사진 등이 걸러졌으므로 단호하게 '등록할 수 없는 사진입니다'라고 안내합니다.", "이건 절대 자동 재시도하면 안 됩니다."]
         ],
         "qa": [
-            "모든 실패 응답에 error_code가 있는지 확인",
-            "프론트에 보여줄 문구가 백엔드 error_policy와 맞는지 확인",
-            "재시도 후 성공하면 failed 상태가 남지 않는지 확인",
-            "최종 실패 상태에서 재분석 버튼이 동작하는지 확인",
-        ],
+            "성공이든 실패든 AI가 뱉어내는 모든 실패 콜백에 빈칸 없이 `error_code`가 확실히 들어있는지 포스트맨으로 찍어보세요.",
+            "프론트엔드 코드에 하드코딩된 에러 팝업 문구가 백엔드 error_policy 명세서랑 토씨 하나 안 틀리고 싱크가 잘 맞는지 확인하세요.",
+            "백엔드 자동 재시도로 기적적으로 성공했을 때, 찰나의 실패(failed) 상태가 화면에 깜빡이며 잔상으로 남지 않는지 눈 크게 뜨고 확인하세요.",
+            "최종 찐 실패 상태가 떨어졌을 때, [수동 재분석] 텍스트 버튼이 제대로 렌더링되고 누르면 큐에 잘 들어가는지 테스트하세요."
+        ]
     },
     "dictionary": {
         "call_order": [
-            "Classify 모델 출력 후보를 만든다.",
-            "후보를 style/color/mood/technique/shape/style_category/occasion 사전에 매핑한다.",
-            "백엔드는 사전 외 값을 거부하거나 저장 전 제거한다.",
-            "태그 사전이 바뀌면 프론트 필터와 검색 인덱스를 함께 업데이트한다.",
+            "[AI 맘대로 떠올리기]: 2단계 Classify 모델이 일단 뇌피셜로 온갖 태그 후보를 마구 뽑아냅니다.",
+            "[사전 매핑 컷오프]: 뽑아낸 단어들을 style, color, mood, shape 등의 '공식 허가 사전(Dictionary)' 필터망에 부어버립니다.",
+            "[백엔드 철통 방어]: 혹시라도 매핑망을 뚫고 이상한 사투리 단어가 백엔드로 넘어오면, 백엔드가 문지기처럼 거부(에러)하거나 조용히 지워버린 채로 DB에 저장합니다.",
+            "[사전 업데이트 동기화]: '가을웜톤'이라는 새 태그가 사전에 추가되면, AI-백엔드-프론트(검색 필터) 3곳의 코드에 동시에 추가하고 배포해야 합니다."
         ],
         "events": [
-            ["새 태그 필요", "사전 수정", "LLM/백엔드/프론트 동시 반영", "모델만 임의 단어 출력 금지"],
-            ["사전 외 단어 반환", "백엔드 검증", "저장 거부 또는 제거", "검색 누락 방지"],
+            ["[상황] 기획팀이 새 태그 추가해달라 함", "사전 수정 및 3자 동기화", "프론트 검색 드롭다운에 추가, 백엔드 validation 통과 처리, AI 모델 프롬프트 인지까지 삼위일체로 챙깁니다.", "AI 모델 혼자만 똑똑해져서 새 단어를 뱉게 놔두면 백엔드에서 500 에러 폭탄이 터집니다."],
+            ["[상황] AI가 사전에 없는 단어 뱉음", "백엔드 무결성 검증 발동", "프론트엔드로는 절대 그 이상한 단어가 내려가지 않도록 DB 저장 전에 백엔드가 조용히 암살(제거)합니다.", "검색 필터에 '블링블링(X)' 같은 오타가 쌓이는 걸 막기 위한 최후 방어선입니다."]
         ],
         "qa": [
-            "표준 사전 외 태그 샘플이 저장되지 않는지 확인",
-            "색상 필터 값과 color_palette 값이 일치하는지 확인",
-            "style_category enum 오타가 없는지 확인",
-            "사전 변경 후 AI 요약과 HTML을 재생성했는지 확인",
-        ],
+            "AI한테 고의로 '울트라캡짱화려함' 같은 요상한 태그를 강제로 뱉게 테스트 모드를 켰을 때, 백엔드가 DB에 저장 안 하고 철벽 방어하는지 꼭 테스트하세요.",
+            "디자인 상세 조회 시 내려오는 `color_palette` 값들이 검색 필터 드롭다운에 있는 옵션 값(value)들과 철자 하나 안 틀리고 일치하는지 비교하세요.",
+            "enum(목록)으로 관리되는 `style_category` 값들에 대소문자나 오타가 껴있어서 프론트 렌더링이 깨지지 않는지 확인하세요.",
+            "사전 단어를 기획자가 바꿨다고 했을 때, 냅다 코드만 고치지 말고 스크립트(`build_all_collaboration_outputs.py`)를 돌려서 HTML 문서를 최신화했는지 챙겨주세요."
+        ]
     },
     "open-questions": {
         "call_order": [
-            "구현 시작 전 동기/비동기 처리 방식을 결정한다.",
-            "callback을 쓴다면 인증 방식과 중복 callback 처리 규칙을 결정한다.",
-            "cropped 이미지 저장 주체와 URL 만료 시간을 결정한다.",
-            "confidence 실패 기준과 자동 재시도 횟수를 결정한다.",
-            "결정 후 `spec_text/12_llm.md`와 HTML/AI 요약을 재생성한다.",
+            "[결정 시작]: 기획, 디자인, 백엔드, 프론트가 모여 앉아 미정인 부분(동기/비동기, 타임아웃 룰 등)을 결판냅니다.",
+            "[보안/인증]: 비동기 콜백을 쓰기로 했다면, 외부 해커가 콜백 URL로 가짜 완료 메시지를 쏠 수 없도록 인증(Secret Token 등) 규칙과 중복 방지 룰을 세웁니다.",
+            "[저장과 만료]: 1단계에서 자른 손톱 이미지 썸네일을 우리 S3에 평생 안고 갈 건지, 한 달 뒤에 날릴 건지 등 돈(인프라 비용)이 걸린 문제를 결정합니다.",
+            "[확신도 및 재시도]: AI가 '나 50% 정도 확신해'라고 할 때 이걸 성공으로 쳐줄지(Threshold), 네트워크 에러 시 최대 몇 번까지 다시 찌를지 정책을 확정합니다.",
+            "[문서 박제]: 결정이 떨어지면 구두로 끄덕이지 말고 즉시 `spec_text/14_decisions.md`에 박제한 뒤 HTML을 재생성합니다."
         ],
         "events": [
-            ["정책 미정", "개발 보류 또는 임시 feature flag", "결정 기록 업데이트", "코드에 임의 기준 하드코딩 금지"],
-            ["정책 변경", "문서 재생성", "백엔드/LLM/프론트 영향 확인", "Notion 링크 최신화"],
+            ["[상황] 정책이 아직 미정일 때", "개발 보류 또는 가짜 뼈대만 짜기", "회의록(결정 기록)이 업데이트될 때까지 로직은 비워두거나 피처 토글(Feature Flag)로 숨겨둡니다.", "프론트 개발자 마음대로 '콜백 오겠지 뭐~' 하고 뇌피셜로 짜지 마세요."],
+            ["[상황] 정책이 갑자기 바뀔 때", "문서 재생성 및 영향도 파악", "HTML을 다시 뽑고, 백엔드/LLM/프론트 중 어디 어디를 고쳐야 하는지 빠르게 리스트업합니다.", "Notion에 걸려있는 문서 공유 링크가 최신 버전을 가리키는지 확인해서 서로 다른 문서 보고 싸우지 않게 합니다."]
         ],
         "qa": [
-            "callback 인증이 없는 상태로 외부 호출을 받지 않는지 확인",
-            "confidence 기준이 테스트 데이터에 적용되는지 확인",
-            "LLM URL 만료 전에 백엔드 저장이 끝나는지 확인",
-            "결정 항목이 spec_text/14_decisions.md에도 반영됐는지 확인",
-        ],
-    },
+            "백엔드 콜백 URL이 인증 토큰 쪼가리도 없이 완전 무방비 열린 문(Open Door) 상태라 아무나 POST 쏘면 디자인 상태가 휙휙 바뀌진 않는지 보안 점검하세요.",
+            "AI가 주는 신뢰도 점수(confidence) 커트라인이 실제 코드 if문에 잘 반영되어 0.3점짜리 쓰레기 태그가 안 남는지 테스트하세요.",
+            "임시로 AWS에 올려둔 썸네일 URL이 프론트엔드가 화면에 그리기도 전에 만료되어 엑스박스(403)가 뜨지 않는지 타이밍 계산을 확실히 해두세요.",
+            "새로 결정된 뜨끈뜨끈한 항목들이 백엔드 파일(`spec_text/14_decisions.md`)에 잘 새겨졌는지 한 번쯤 크로스 체크해주세요."
+        ]
+    }
 }
+
 
 
 PIPELINE_MAP = [
@@ -358,7 +357,7 @@ PIPELINE_MAP = [
     },
     {
         "id": "dictionary",
-        "title": "표준 태그 사전",
+        "title": '표준 태그 사전',
         "summary": "Classify 결과가 반드시 따라야 하는 enum/태그 사전과 백엔드 저장 필드.",
         "source_needles": ["부록 A: 표준 태그 사전"],
         "backend_files": ["spec_text/06_owner_design.md", "spec_text/12_llm.md", "spec_text/14_decisions.md"],
@@ -586,7 +585,8 @@ def clip_text(value, limit=160):
 
 def build_ai_brief(index):
     llm_spec = index["llm_spec"]
-    lines = [
+
+    preamble_lines = [
         "# AI 작업용 요약: LLM 파이프라인 ↔ 백엔드",
         "",
         "이 텍스트는 HTML 전체를 AI 코딩 도구에 붙여넣는 대신 사용할 압축 컨텍스트입니다.",
@@ -607,62 +607,88 @@ def build_ai_brief(index):
         "- 10초 이상 걸리면 동기 응답보다 callback/webhook 구조를 권장합니다.",
         "- 이미지 저장 주체, callback 인증, confidence 실패 기준은 구현 전 합의해야 합니다.",
         "",
-        "단계별 구현 컨텍스트:",
+        "LLM 에러 코드별 처리 규칙:",
     ]
+    for code, meaning, owner_message in llm_spec.get("error_codes", []):
+        preamble_lines.append(f"- {code}: {meaning} → 사장님 안내: {owner_message}")
 
+    preamble_lines.extend([
+        "",
+        "디자인 분석 상태별 처리:",
+        "- pending/in_progress → \"분석 중\". 사장님 화면에서 하나로 묶어 표시. 고객 미노출.",
+        "- done → \"분석 완료\". 고객 노출 가능 (owner 승인 + shop active + design active 조건도 충족 필요).",
+        "- failed → \"분석 실패\". 재분석 버튼(POST /owner/designs/{id}/reanalyze) 또는 사진 교체 동선 표시.",
+    ])
+    preamble = "\n".join(preamble_lines).strip()
+
+    sections = []
+    all_section_lines = []
     for step in index["steps"]:
-        lines.extend(["", f"## {step['title']}", f"요약: {step['summary']}"])
+        section_lines = [f"## {step['title']}", f"요약: {step['summary']}"]
         if step.get("plain_language"):
-            lines.append("쉽게 말하면:")
-            lines.extend(f"- {row}" for row in step["plain_language"])
+            section_lines.append("쉽게 말하면:")
+            section_lines.extend(f"- {row}" for row in step["plain_language"])
         if step.get("guide"):
-            lines.append("구현 가이드:")
-            lines.extend(f"- {row}" for row in step["guide"])
+            section_lines.append("구현 가이드:")
+            section_lines.extend(f"- {row}" for row in step["guide"])
         if step.get("checkpoints"):
-            lines.append("체크포인트:")
-            lines.extend(f"- {row}" for row in step["checkpoints"])
+            section_lines.append("체크포인트:")
+            section_lines.extend(f"- {row}" for row in step["checkpoints"])
         playbook = step.get("playbook") or {}
         if playbook.get("call_order"):
-            lines.append("처리/API 순서:")
-            lines.extend(f"- {row}" for row in playbook["call_order"])
+            section_lines.append("처리/API 순서:")
+            section_lines.extend(f"- {row}" for row in playbook["call_order"])
         if playbook.get("events"):
-            lines.append("이벤트별 처리:")
-            lines.extend(
+            section_lines.append("이벤트별 처리:")
+            section_lines.extend(
                 f"- {trigger} -> {process} -> 성공: {success} / 실패: {failure}"
                 for trigger, process, success, failure in playbook["events"]
             )
         if playbook.get("qa"):
-            lines.append("QA/계약 테스트:")
-            lines.extend(f"- [ ] {row}" for row in playbook["qa"])
+            section_lines.append("QA/계약 테스트:")
+            section_lines.extend(f"- [ ] {row}" for row in playbook["qa"])
         if step.get("contract"):
             contract = step["contract"]
-            lines.append(f"Endpoint: {contract['endpoint']}")
-            lines.append("Request fields:")
-            lines.extend(f"- {field['name']}: {field.get('meaning') or '-'}" for field in contract["request_fields"])
-            lines.append("Response fields:")
-            lines.extend(f"- {field['name']}: {field.get('meaning') or '-'}" for field in contract["response_fields"])
+            section_lines.append(f"Endpoint: {contract['endpoint']}")
+            section_lines.append("Request fields:")
+            section_lines.extend(f"- {field['name']}: {field.get('meaning') or '-'}" for field in contract["request_fields"])
+            section_lines.append("Response fields:")
+            section_lines.extend(f"- {field['name']}: {field.get('meaning') or '-'}" for field in contract["response_fields"])
         if step.get("field_refs"):
             field_names = ", ".join(f"{ref['entity']}.{ref['name']}" for ref in step["field_refs"])
-            lines.append(f"관련 백엔드 필드: {field_names}")
+            section_lines.append(f"관련 백엔드 필드: {field_names}")
         if step.get("api_refs"):
-            lines.append("관련 백엔드 API:")
-            lines.extend(
+            section_lines.append("관련 백엔드 API:")
+            section_lines.extend(
                 f"- {ref['endpoint']}: {clip_text(ref.get('easy_purpose') or ref.get('purpose'), 120)}"
                 for ref in step["api_refs"]
             )
 
-    lines.extend(["", "에러 코드:"])
-    for code, meaning, owner_message in llm_spec.get("error_codes", []):
-        lines.append(f"- {code}: {meaning} / 사장님 안내: {owner_message}")
+        sections.append({
+            "id": step["id"],
+            "title": step["title"],
+            "text": "\n".join(section_lines).strip(),
+        })
+        all_section_lines.append("")
+        all_section_lines.extend(section_lines)
 
-    lines.extend(["", "표준 태그 사전:"])
+    footer_lines = [
+        "",
+        "표준 태그 사전:",
+    ]
     for key, values in llm_spec.get("standard_tags", {}).items():
-        lines.append(f"- {key}: {', '.join(values)}")
+        footer_lines.append(f"- {key}: {', '.join(values)}")
+    footer_lines.extend(["", "논의 필요 질문:"])
+    footer_lines.extend(f"- {row}" for row in llm_spec.get("worker_questions", []))
 
-    lines.extend(["", "논의 필요 질문:"])
-    lines.extend(f"- {row}" for row in llm_spec.get("worker_questions", []))
+    full_lines = preamble_lines + ["\n단계별 구현 컨텍스트:"] + all_section_lines + footer_lines
+    full_text = "\n".join(full_lines).strip() + "\n"
 
-    return "\n".join(lines).strip() + "\n"
+    return {
+        "full": full_text,
+        "preamble": preamble,
+        "sections": sections,
+    }
 
 
 def build_index():
@@ -702,7 +728,10 @@ def build_index():
             "apis": all_apis,
         },
     }
-    index["ai_brief"] = build_ai_brief(index)
+    ai_result = build_ai_brief(index)
+    index["ai_brief"] = ai_result["full"]
+    index["ai_preamble"] = ai_result["preamble"]
+    index["ai_sections"] = ai_result["sections"]
     return index
 
 
@@ -768,7 +797,7 @@ HTML_TEMPLATE = """<!doctype html>
       padding: 16px;
       overflow: auto;
     }
-    .content { padding: 18px 22px 36px; overflow: auto; }
+    .content { padding: 24px 32px 48px; overflow: auto; }
     .meta { color: var(--muted); font-size: 12px; line-height: 1.45; }
     .stats { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
     .header-right {
@@ -865,14 +894,13 @@ HTML_TEMPLATE = """<!doctype html>
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      gap: 16px;
     }
     .panel {
-      background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 12px;
-      min-width: 0;
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 16px;
     }
     .panel.full { grid-column: 1 / -1; }
     table {
@@ -885,19 +913,20 @@ HTML_TEMPLATE = """<!doctype html>
     }
     th, td {
       border-bottom: 1px solid var(--line);
-      padding: 8px 9px;
+      padding: 12px 14px;
       text-align: left;
       vertical-align: top;
-      line-height: 1.45;
+      line-height: 1.6;
     }
     th {
       background: #f8fafc;
       color: #2d3a4a;
-      font-size: 12px;
+      font-size: 13px;
+      font-weight: 700;
     }
     tr:last-child td { border-bottom: 0; }
-    ul { margin: 0; padding-left: 18px; }
-    li { margin: 4px 0; }
+    ul, ol { margin: 0; padding-left: 20px; line-height: 1.6; }
+    li { margin: 8px 0; }
     .excerpt {
       white-space: pre-wrap;
       border: 1px solid var(--line);
@@ -932,6 +961,20 @@ HTML_TEMPLATE = """<!doctype html>
       padding: 8px;
       line-height: 1.45;
     }
+    .copy-dropdown { position: relative; display: inline-block; }
+    .copy-menu {
+      display: none; position: absolute; right: 0; top: 100%;
+      background: #fff; border: 1px solid var(--line); border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.12); z-index: 100;
+      min-width: 280px; padding: 4px 0; margin-top: 4px;
+    }
+    .copy-menu-item {
+      display: block; width: 100%; padding: 8px 16px; border: none;
+      background: none; text-align: left; cursor: pointer;
+      font-size: 13px; color: var(--text); white-space: nowrap;
+    }
+    .copy-menu-item:hover { background: #f5f7fa; }
+    .copy-menu-divider { border-top: 1px solid var(--line); margin: 4px 0; }
     @media (max-width: 980px) {
       header { display: block; }
       .stats { justify-content: flex-start; margin-top: 12px; }
@@ -953,7 +996,13 @@ HTML_TEMPLATE = """<!doctype html>
     <div class="header-right">
       <div class="stats" id="stats"></div>
       <div class="actions">
-        <button class="copy-btn" id="copyAiBriefBtn" type="button">AI 요약 복사</button>
+        <div class="copy-dropdown">
+          <button class="copy-btn" id="copyAiBriefBtn" type="button">AI 요약 복사 ▾</button>
+          <div class="copy-menu" id="copyMenu">
+            <button class="copy-menu-item" data-copy="full" type="button">📋 전체 복사</button>
+            <div class="copy-menu-divider"></div>
+          </div>
+        </div>
         <a class="text-link" href="llm_pipeline_backend_index.ai.txt">AI용 TXT 열기</a>
         <span class="meta" id="copyAiBriefStatus"></span>
       </div>
@@ -1208,14 +1257,14 @@ HTML_TEMPLATE = """<!doctype html>
         : `<div class="meta">검색어를 입력하면 필드/API가 표시됩니다.</div>`;
     }
 
-    async function copyAiBrief() {
+    async function copyToClipboard(text) {
       const status = document.getElementById("copyAiBriefStatus");
       try {
-        await navigator.clipboard.writeText(data.ai_brief || "");
+        await navigator.clipboard.writeText(text);
         status.textContent = "복사됨";
       } catch (error) {
         const textarea = document.createElement("textarea");
-        textarea.value = data.ai_brief || "";
+        textarea.value = text;
         textarea.setAttribute("readonly", "");
         textarea.style.position = "fixed";
         textarea.style.left = "-9999px";
@@ -1225,12 +1274,48 @@ HTML_TEMPLATE = """<!doctype html>
         document.body.removeChild(textarea);
         status.textContent = "복사됨";
       }
-      window.setTimeout(() => { status.textContent = ""; }, 1800);
+      document.getElementById("copyMenu").style.display = "none";
+      window.setTimeout(function() { status.textContent = ""; }, 1800);
     }
+
+    function buildCopyMenu() {
+      const menu = document.getElementById("copyMenu");
+      (data.ai_sections || []).forEach(function(sec) {
+        const btn = document.createElement("button");
+        btn.className = "copy-menu-item";
+        btn.setAttribute("data-copy", "section-" + sec.id);
+        btn.type = "button";
+        btn.textContent = sec.title;
+        menu.appendChild(btn);
+      });
+    }
+
+    document.getElementById("copyAiBriefBtn").addEventListener("click", function(e) {
+      const menu = document.getElementById("copyMenu");
+      menu.style.display = menu.style.display === "none" ? "block" : "none";
+      e.stopPropagation();
+    });
+    document.addEventListener("click", function() {
+      document.getElementById("copyMenu").style.display = "none";
+    });
+    document.getElementById("copyMenu").addEventListener("click", function(e) {
+      const btn = e.target.closest(".copy-menu-item");
+      if (!btn) return;
+      const key = btn.getAttribute("data-copy");
+      let text = "";
+      if (key === "full") {
+        text = data.ai_brief || "";
+      } else if (key.startsWith("section-")) {
+        const id = key.replace("section-", "");
+        const sec = (data.ai_sections || []).find(function(s) { return s.id === id; });
+        text = (data.ai_preamble || "") + "\\n\\n단계별 구현 컨텍스트:\\n\\n" + (sec ? sec.text : "");
+      }
+      copyToClipboard(text);
+    });
 
     document.getElementById("filterInput").addEventListener("input", renderList);
     document.getElementById("globalSearch").addEventListener("input", renderGlobalResults);
-    document.getElementById("copyAiBriefBtn").addEventListener("click", copyAiBrief);
+    buildCopyMenu();
     renderStats();
     renderList();
     renderDetail();
