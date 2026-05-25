@@ -934,6 +934,67 @@ HTML_TEMPLATE = """<!doctype html>
       ? `<a href="${escapeHtml(ref.href)}">${escapeHtml(ref.source_file)}${ref.line ? ":" + ref.line : ""}</a>`
       : escapeHtml(ref.source_file || "");
 
+    const easyFieldMap = {
+      verification_status: "사장님 계정이 사업자 인증을 통과했는지 나타냅니다. 승인 전에는 공개/예약 처리를 막는 기준이 됩니다.",
+      visibility: "고객에게 보이는지 정하는 공개 상태입니다. draft는 임시저장, active는 공개, hidden은 숨김입니다.",
+      auto_accept: "예약 요청을 사장님 확인 없이 자동으로 받을지 정하는 설정입니다. MVP 기본값은 수동 수락입니다.",
+      payment_method: "현장결제인지, 계좌이체 예약금 안내인지 정하는 결제 운영 방식입니다.",
+      deposit_amount: "계좌이체 예약금으로 안내할 금액입니다.",
+      bank_name: "입금 안내에 보여줄 은행명입니다.",
+      bank_account_number: "입금 안내에 보여줄 계좌번호입니다.",
+      bank_account_holder: "입금 안내에 보여줄 예금주명입니다.",
+      owner_tags: "사장님이 직접 붙이는 자유 태그입니다. AI 태그와 별도로 저장해서 검색 의도에 반영합니다.",
+      ai_tags: "AI가 표준 태그 사전에서 골라 붙인 태그입니다. 고객 검색과 필터에 사용됩니다.",
+      ai_color_palette: "AI가 판단한 대표 색상 목록입니다.",
+      ai_style_category: "AI가 판단한 디자인의 큰 스타일 분류입니다.",
+      ai_analysis_status: "AI 분석 진행 상태입니다. 사장님 화면의 분석 중/완료/실패 표시 기준입니다.",
+      original_url: "사장님이 올린 원본 이미지 주소입니다.",
+      cropped_url: "AI가 손톱 영역만 잘라 만든 이미지 주소입니다.",
+      ai_transform_status: "원본 이미지에서 손톱 영역을 잘라내는 1단계 성공/실패 상태입니다.",
+      ai_classify_status: "잘라낸 이미지에서 태그와 색상을 뽑는 2단계 성공/실패 상태입니다.",
+      status: "예약이나 작업이 현재 어느 상태인지 나타냅니다. 화면 버튼 노출과 다음 동작이 이 값으로 갈립니다.",
+      user_payment_notified_at: "고객이 [입금 완료]를 눌러 사장님에게 확인 요청을 보낸 시각입니다.",
+      owner_payment_confirmed_at: "사장님이 실제 입금을 확인하고 승인한 시각입니다.",
+      reservation_policy_snapshot: "예약 당시의 운영 정책을 복사해 둔 값입니다. 나중에 샵 설정이 바뀌어도 기존 예약 기준을 보존합니다.",
+      payment_method_snapshot: "예약 당시의 결제 방식을 복사해 둔 값입니다.",
+      shop_reply: "리뷰에 사장님이 남긴 답변입니다.",
+      deeplink_target: "알림을 클릭했을 때 이동할 화면 위치입니다.",
+    };
+
+    const easyApiMap = {
+      "POST /owner/auth/register": "사장님 계정을 새로 만드는 가입 API입니다.",
+      "GET /owner/me": "로그인한 사장님의 계정 상태와 사업자 인증 상태를 확인합니다.",
+      "POST /owner/business-verification": "사업자등록증 등 인증 정보를 제출하거나 재제출합니다.",
+      "POST /owner/shop": "사장님 샵 초안을 처음 만듭니다. 승인 전에도 저장은 가능하지만 공개는 막습니다.",
+      "GET /owner/shop": "내 단수 샵 정보를 불러옵니다.",
+      "PATCH /owner/shop": "샵 이름, 주소, 전화번호 같은 기본 정보를 수정합니다.",
+      "PATCH /owner/shop/visibility": "샵을 고객에게 공개하거나 숨깁니다. 사업자 승인 후에만 공개할 수 있습니다.",
+      "POST /owner/designs": "새 디자인을 등록합니다. 화면은 바로 저장되고 AI 분석은 뒤에서 진행됩니다.",
+      "GET /owner/designs": "내 디자인 목록을 가져옵니다. 분석 중/실패/숨김 탭 구성에 사용합니다.",
+      "PATCH /owner/designs/{design_id}": "디자인 제목, 가격, 소요 시간, 사장님 태그를 수정합니다.",
+      "POST /owner/designs/{design_id}/images": "디자인 사진을 추가합니다. 총 5장 제한을 넘으면 실패합니다.",
+      "POST /owner/designs/{design_id}/reanalyze": "AI 분석 실패 또는 재분석 버튼과 연결됩니다.",
+      "PATCH /owner/designs/{design_id}/visibility": "디자인을 고객에게 공개하거나 숨깁니다.",
+      "GET /owner/reservations": "사장님 예약 목록과 캘린더를 채우는 API입니다.",
+      "POST /owner/reservations/{id}/accept": "사장님이 예약 요청을 수락합니다. 계좌이체면 바로 확정이 아니라 입금 대기 상태가 됩니다.",
+      "POST /owner/reservations/{id}/payment-confirmed": "사장님이 실제 입금을 확인하고 예약을 확정합니다.",
+      "POST /owner/reservations/{id}/reject": "사장님이 예약 요청을 거절합니다.",
+      "POST /owner/reservations/{id}/complete": "시술 완료 처리 버튼과 연결됩니다.",
+      "POST /owner/reservations/{id}/no-show": "고객이 오지 않았을 때 노쇼로 표시합니다. MVP에서는 방어적으로 제한합니다.",
+      "GET /owner/reviews": "내 샵 리뷰 목록을 보여줍니다.",
+      "GET /owner/snaps": "내 샵이 태그된 스네일 게시물을 보여줍니다.",
+      "GET /owner/dashboard/summary": "대시보드 숫자 카드들을 한 번에 가져옵니다.",
+      "GET /owner/notifications": "사장님 알림함 목록을 가져옵니다.",
+    };
+
+    function easyField(ref) {
+      return easyFieldMap[ref.name] || ref.note || "-";
+    }
+
+    function easyApi(ref) {
+      return easyApiMap[ref.endpoint] || ref.purpose || "-";
+    }
+
     function renderStats() {
       document.getElementById("generatedMeta").textContent =
         `${data.source.frontend_spec} / ${data.source.backend_spec_dir} / ${data.generated_at}`;
@@ -1015,8 +1076,7 @@ HTML_TEMPLATE = """<!doctype html>
       const fieldRows = item.field_refs.map((ref) => `
         <tr>
           <td><code>${escapeHtml(ref.entity)}.${escapeHtml(ref.name)}</code></td>
-          <td>${escapeHtml(ref.type)}</td>
-          <td>${escapeHtml(ref.required)}</td>
+          <td>${escapeHtml(easyField(ref))}</td>
           <td>${escapeHtml(ref.note)}</td>
           <td>${sourceLink(ref)}</td>
         </tr>
@@ -1024,6 +1084,7 @@ HTML_TEMPLATE = """<!doctype html>
       const apiRows = item.api_refs.map((ref) => `
         <tr>
           <td><code>${escapeHtml(ref.endpoint)}</code><div class="meta">${escapeHtml(ref.group)}</div></td>
+          <td>${escapeHtml(easyApi(ref))}</td>
           <td>${escapeHtml(ref.purpose)}</td>
           <td>${escapeHtml(ref.params)}</td>
           <td>${sourceLink(ref)}</td>
@@ -1046,8 +1107,8 @@ HTML_TEMPLATE = """<!doctype html>
           <div class="panel"><h3>프론트 섹션</h3><table><thead><tr><th>ID</th><th>제목</th><th>라인</th></tr></thead><tbody>${frontRows || "<tr><td colspan='3'>연결된 섹션 없음</td></tr>"}</tbody></table></div>
           <div class="panel"><h3>체크 포인트</h3>${checkpoints}</div>
           ${missingPanel}
-          <div class="panel full"><h3>관련 필드</h3><table><thead><tr><th>필드</th><th>타입</th><th>필수</th><th>메모</th><th>출처</th></tr></thead><tbody>${fieldRows || "<tr><td colspan='5'>관련 필드 없음</td></tr>"}</tbody></table></div>
-          <div class="panel full"><h3>관련 API</h3><table><thead><tr><th>엔드포인트</th><th>용도</th><th>요청값</th><th>출처</th></tr></thead><tbody>${apiRows || "<tr><td colspan='4'>관련 API 없음</td></tr>"}</tbody></table></div>
+          <div class="panel full"><h3>관련 필드</h3><table><thead><tr><th>필드</th><th>쉽게 말하면</th><th>원문 메모</th><th>출처</th></tr></thead><tbody>${fieldRows || "<tr><td colspan='4'>관련 필드 없음</td></tr>"}</tbody></table></div>
+          <div class="panel full"><h3>관련 API</h3><table><thead><tr><th>엔드포인트</th><th>쉽게 말하면</th><th>원문 용도</th><th>요청값</th><th>출처</th></tr></thead><tbody>${apiRows || "<tr><td colspan='5'>관련 API 없음</td></tr>"}</tbody></table></div>
           <div class="panel full"><h3>프론트 명세 발췌</h3><div class="excerpt">${escapeHtml(excerpt || "발췌 없음")}</div></div>
         </div>
       `;
@@ -1077,7 +1138,8 @@ HTML_TEMPLATE = """<!doctype html>
             ? `<code>${escapeHtml(item.endpoint)}</code><div class="meta">${escapeHtml(item.group)} · API</div>`
             : `<code>${escapeHtml(item.entity)}.${escapeHtml(item.name)}</code><div class="meta">${escapeHtml(item.type)} · ${escapeHtml(item.required)}</div>`;
           const body = item.endpoint ? item.purpose : item.note;
-          return `<div class="result-row">${label}<div>${escapeHtml(body)}</div><div class="meta">${sourceLink(item)}</div></div>`;
+          const easy = item.endpoint ? easyApi(item) : easyField(item);
+          return `<div class="result-row">${label}<div>${escapeHtml(easy || body)}</div><div class="meta">${escapeHtml(body)}</div><div class="meta">${sourceLink(item)}</div></div>`;
         }).join("")
         : `<div class="meta">검색어를 입력하면 필드/API가 표시됩니다.</div>`;
     }

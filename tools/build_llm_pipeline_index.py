@@ -21,6 +21,94 @@ INDEX_HTML_PATH = OUTPUT_DIR / "llm_pipeline_backend_index.html"
 SHARED_HTML_PATH = DOCS_DIR / "llm_pipeline_backend_index.html"
 
 
+EASY_FIELD_EXPLANATIONS = {
+    "visibility": "이 디자인이나 샵을 고객에게 보여줄지 정하는 공개 상태입니다. draft는 임시저장, active는 공개, hidden은 숨김입니다.",
+    "ai_analysis_status": "AI 분석이 어디까지 진행됐는지 보여주는 전체 상태입니다. 사장님 화면의 '분석 중/완료/실패' 표시 기준이 됩니다.",
+    "ai_analysis_started_at": "AI 분석이 시작된 시각입니다. 분석이 오래 걸릴 때 몇 분째 처리 중인지 보여주는 데 씁니다.",
+    "ai_analysis_completed_at": "AI 분석이 끝난 시각입니다. 성공뿐 아니라 최종 실패 시각을 남길 때도 씁니다.",
+    "image_id": "이미지 한 장을 구분하는 고유 번호입니다. LLM 결과가 어느 이미지의 결과인지 맞추는 열쇠입니다.",
+    "original_url": "사장님이 처음 올린 원본 사진의 저장 위치입니다. 나중에 재분석할 수 있도록 보관합니다.",
+    "cropped_url": "LLM이 원본에서 손톱 부분만 잘라 만든 이미지의 저장 위치입니다. Classify 단계와 썸네일에 사용됩니다.",
+    "ai_transform_status": "원본 사진에서 손톱 영역을 잘라내는 1단계가 성공했는지 실패했는지 나타냅니다.",
+    "ai_classify_status": "잘라낸 이미지를 보고 태그와 색상을 뽑는 2단계가 성공했는지 실패했는지 나타냅니다.",
+    "ai_tags": "LLM이 표준 태그 사전에서 골라준 디자인 태그입니다. 고객 검색과 필터에 직접 영향을 줍니다.",
+    "ai_color_palette": "LLM이 판단한 대표 색상 목록입니다. 색상 필터와 추천에 사용됩니다.",
+    "ai_style_category": "LLM이 판단한 디자인의 큰 스타일 분류입니다. 예: simple, glamour, trendy.",
+    "owner_tags": "사장님이 직접 입력한 자유 태그입니다. LLM 태그와 별도로 보관해서 사장님 의도를 검색에 반영합니다.",
+}
+
+
+EASY_CONTRACT_FIELD_EXPLANATIONS = {
+    "image_id": "백엔드와 LLM이 같은 이미지를 가리키기 위해 쓰는 고유 번호입니다.",
+    "image_url": "LLM이 내려받아 분석할 이미지 파일 주소입니다.",
+    "callback_url": "LLM 작업이 끝났을 때 결과를 되돌려줄 백엔드 주소입니다.",
+    "options.output_size": "잘라낸 이미지의 목표 크기입니다. 예: 1080x1080.",
+    "options.background": "잘라낸 이미지의 배경 처리 방식입니다. 예: 투명 배경.",
+    "status": "작업 성공 여부입니다. success면 성공, failed면 실패입니다.",
+    "cropped_image_url": "Transform 결과로 만들어진 손톱 영역 이미지 주소입니다.",
+    "cropped_image_size": "Transform 결과 이미지의 실제 크기입니다.",
+    "confidence": "Transform 결과를 모델이 얼마나 확신하는지 나타내는 점수입니다.",
+    "nail_count_detected": "사진에서 감지한 손톱 개수입니다.",
+    "processing_time_ms": "LLM 작업에 걸린 시간입니다. 밀리초 단위입니다.",
+    "error_code": "실패했을 때 실패 이유를 기계가 읽을 수 있게 정한 코드입니다.",
+    "error_message": "실패했을 때 사람이 읽을 수 있는 상세 설명입니다.",
+    "locale": "결과 언어와 지역 기준입니다. 한국 서비스는 ko_KR을 사용합니다.",
+    "options.max_tags": "LLM이 최대 몇 개의 태그를 돌려줄지 정합니다.",
+    "options.include_color_palette": "대표 색상도 함께 받을지 정합니다.",
+    "options.include_style_category": "큰 스타일 분류도 함께 받을지 정합니다.",
+    "tags": "검색에 사용할 디자인 태그 목록입니다. 반드시 표준 태그 사전 안의 값이어야 합니다.",
+    "color_palette": "디자인의 대표 색상 목록입니다.",
+    "style_category": "디자인의 큰 스타일 분류입니다.",
+    "nail_shape": "손톱 모양입니다. 현재 백엔드 저장 필드 추가 여부는 별도 결정이 필요합니다.",
+    "confidence_overall": "Classify 결과 전체를 모델이 얼마나 확신하는지 나타내는 점수입니다.",
+}
+
+
+EASY_API_EXPLANATIONS = {
+    "POST /owner/designs": "사장님이 새 디자인을 등록하는 버튼과 연결됩니다. 화면은 바로 등록 완료로 넘어가고, AI 분석은 뒤에서 따로 진행됩니다.",
+    "GET /owner/designs": "사장님이 내 디자인 목록을 볼 때 사용합니다. 분석 중, 분석 실패, 숨김 같은 탭을 만들 때 필요합니다.",
+    "GET /owner/designs/{design_id}": "디자인 하나의 상세 정보와 AI 분석 상태를 확인할 때 사용합니다.",
+    "PATCH /owner/designs/{design_id}": "디자인 제목, 가격, 소요 시간, 태그 같은 정보를 수정할 때 사용합니다.",
+    "POST /owner/designs/{design_id}/images": "기존 디자인에 사진을 추가할 때 사용합니다. 사진이 바뀌면 AI 분석도 다시 시작됩니다.",
+    "DELETE /owner/designs/{design_id}/images/{image_id}": "디자인 사진을 삭제할 때 사용합니다. 사진이 바뀌므로 AI 분석이 다시 필요할 수 있습니다.",
+    "POST /owner/designs/{design_id}/reanalyze": "분석이 실패했거나 다시 분석하고 싶을 때 누르는 '재분석' 버튼과 연결됩니다.",
+}
+
+
+STEP_PLAIN_LANGUAGE = {
+    "flow": [
+        "사장님이 디자인 사진을 올리면 백엔드는 먼저 저장만 하고 화면에 빠르게 응답합니다.",
+        "그 뒤 백엔드가 LLM에게 사진 분석을 맡기고, LLM 결과가 돌아오면 디자인의 검색 태그와 노출 가능 상태를 업데이트합니다.",
+        "즉, 사장님이 등록 버튼을 누르는 일과 AI 분석이 끝나는 일은 같은 순간에 일어나지 않습니다.",
+    ],
+    "transform": [
+        "Transform은 원본 사진에서 손톱 부분만 보기 좋게 잘라내는 단계입니다.",
+        "이 단계가 성공해야 다음 Classify 단계에서 색상과 스타일을 안정적으로 판단할 수 있습니다.",
+        "실패하면 태그 분석으로 넘어가지 않고, 사장님에게 사진을 다시 올리거나 재분석하라는 동선을 보여줘야 합니다.",
+    ],
+    "classify": [
+        "Classify는 잘라낸 손톱 이미지를 보고 검색에 필요한 태그와 색상을 붙이는 단계입니다.",
+        "LLM이 아무 단어나 만들면 검색 필터와 맞지 않으므로, 정해진 표준 태그 사전 안에서만 골라야 합니다.",
+        "이 결과가 고객이 '핑크', '프렌치', '봄' 같은 조건으로 검색할 때 사용됩니다.",
+    ],
+    "errors": [
+        "LLM 실패는 단순 서버 오류뿐 아니라 사진 품질 문제일 수도 있습니다.",
+        "백엔드는 실패 코드를 보고 사장님에게 '다시 촬영', '재분석', '잠시 후 재시도' 중 어떤 안내를 보여줄지 결정합니다.",
+        "같은 failed라도 원인별로 다음 행동이 달라야 화면이 친절해집니다.",
+    ],
+    "dictionary": [
+        "표준 태그 사전은 LLM이 사용할 수 있는 단어 목록입니다.",
+        "이 목록 밖의 단어가 들어오면 고객 검색과 필터에서 빠질 수 있습니다.",
+        "태그를 추가하거나 이름을 바꾸면 LLM, 백엔드 검색, 프론트 필터를 함께 업데이트해야 합니다.",
+    ],
+    "open-questions": [
+        "이 항목들은 코드를 짜기 전에 팀끼리 먼저 정해야 하는 운영 규칙입니다.",
+        "예를 들어 LLM 결과를 바로 받을지, 나중에 callback으로 받을지에 따라 백엔드 구조가 달라집니다.",
+        "이미지 저장 주체와 신뢰도 기준도 나중에 바꾸기 어려우므로 초기에 합의해야 합니다.",
+    ],
+}
+
+
 PIPELINE_MAP = [
     {
         "id": "flow",
@@ -250,6 +338,7 @@ def resolve_field_refs(mapping, backend):
                     **field_data,
                     "entity": entity,
                     "href": link_for_source(field_data["source_file"], field_data["line"]),
+                    "easy_note": EASY_FIELD_EXPLANATIONS.get(field, field_data["note"]),
                 }
             )
     return refs, missing
@@ -273,6 +362,7 @@ def resolve_api_refs(mapping, backend):
                     **api_data,
                     "group": group,
                     "href": link_for_source(api_data["source_file"], api_data["line"]),
+                    "easy_purpose": EASY_API_EXPLANATIONS.get(endpoint, api_data["purpose"]),
                 }
             )
     return refs, missing
@@ -287,11 +377,19 @@ def contract_from_llm_spec(llm_spec, key):
         "purpose": contract.get("purpose", ""),
         "endpoint": contract.get("suggested_endpoint", ""),
         "request_fields": [
-            {"name": field, "href": link_for_source(source_file, find_line(ROOT / source_file, f'"{field}"'))}
+            {
+                "name": field,
+                "href": link_for_source(source_file, find_line(ROOT / source_file, f'"{field}"')),
+                "meaning": EASY_CONTRACT_FIELD_EXPLANATIONS.get(field, ""),
+            }
             for field in contract.get("request_fields", [])
         ],
         "response_fields": [
-            {"name": field, "href": link_for_source(source_file, find_line(ROOT / source_file, f'"{field}"'))}
+            {
+                "name": field,
+                "href": link_for_source(source_file, find_line(ROOT / source_file, f'"{field}"')),
+                "meaning": EASY_CONTRACT_FIELD_EXPLANATIONS.get(field, ""),
+            }
             for field in contract.get("response_fields", [])
         ],
         "recommendation": contract.get("recommendation", ""),
@@ -315,6 +413,7 @@ def resolve_step(mapping, backend, llm_spec, source_sections):
     coverage = 1.0 if total_expected == 0 else found / total_expected
     return {
         **mapping,
+        "plain_language": STEP_PLAIN_LANGUAGE.get(mapping["id"], []),
         "contract": contract_from_llm_spec(llm_spec, mapping.get("contract_key")),
         "source_refs": source_refs,
         "file_refs": file_refs_for(mapping.get("backend_files", [])),
@@ -330,12 +429,26 @@ def flatten_backend(backend):
     fields = []
     for entity, entity_data in sorted(backend["entities"].items()):
         for field in entity_data["fields"].values():
-            fields.append({**field, "entity": entity, "href": link_for_source(field["source_file"], field["line"])})
+            fields.append(
+                {
+                    **field,
+                    "entity": entity,
+                    "href": link_for_source(field["source_file"], field["line"]),
+                    "easy_note": EASY_FIELD_EXPLANATIONS.get(field["name"], field["note"]),
+                }
+            )
 
     apis = []
     for group, group_data in sorted(backend["apis"].items()):
         for api in group_data["items"].values():
-            apis.append({**api, "group": group, "href": link_for_source(api["source_file"], api["line"])})
+            apis.append(
+                {
+                    **api,
+                    "group": group,
+                    "href": link_for_source(api["source_file"], api["line"]),
+                    "easy_purpose": EASY_API_EXPLANATIONS.get(api["endpoint"], api["purpose"]),
+                }
+            )
 
     return fields, apis
 
@@ -555,6 +668,15 @@ HTML_TEMPLATE = """<!doctype html>
       line-height: 1.55;
       color: #2d3a4a;
     }
+    .plain {
+      border: 1px solid #cde7df;
+      background: #f0faf7;
+      border-radius: 6px;
+      padding: 10px;
+      line-height: 1.55;
+      color: #164e45;
+    }
+    .plain ul { margin-top: 4px; }
     .index-results {
       display: grid;
       gap: 6px;
@@ -678,19 +800,25 @@ HTML_TEMPLATE = """<!doctype html>
 
     function renderContract(contract) {
       if (!contract) return `<div class="meta">이 단계는 별도 endpoint 계약 없음</div>`;
-      const req = contract.request_fields.map((field) => `<span class="chip">${link(field.href, field.name)}</span>`).join("");
-      const res = contract.response_fields.map((field) => `<span class="chip">${link(field.href, field.name)}</span>`).join("");
+      const requestRows = contract.request_fields.map((field) => `
+        <tr><td>${link(field.href, field.name)}</td><td>${escapeHtml(field.meaning || "-")}</td></tr>
+      `).join("");
+      const responseRows = contract.response_fields.map((field) => `
+        <tr><td>${link(field.href, field.name)}</td><td>${escapeHtml(field.meaning || "-")}</td></tr>
+      `).join("");
       return `
         <table>
           <tbody>
             <tr><th>Endpoint</th><td><code>${escapeHtml(contract.endpoint)}</code></td></tr>
             <tr><th>Purpose</th><td>${escapeHtml(contract.purpose)}</td></tr>
-            <tr><th>Request</th><td><div class="chips">${req}</div></td></tr>
-            <tr><th>Response</th><td><div class="chips">${res}</div></td></tr>
             <tr><th>Recommendation</th><td>${escapeHtml(contract.recommendation || "-")}</td></tr>
             <tr><th>Source</th><td>${link(contract.href, contract.source_file)}</td></tr>
           </tbody>
         </table>
+        <h3>백엔드가 LLM에게 보내는 값</h3>
+        <table><thead><tr><th>필드</th><th>쉽게 말하면</th></tr></thead><tbody>${requestRows}</tbody></table>
+        <h3>LLM이 백엔드에게 돌려주는 값</h3>
+        <table><thead><tr><th>필드</th><th>쉽게 말하면</th></tr></thead><tbody>${responseRows}</tbody></table>
       `;
     }
 
@@ -715,6 +843,9 @@ HTML_TEMPLATE = """<!doctype html>
       const guide = step.guide?.length
         ? `<ul>${step.guide.map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ul>`
         : `<div class="meta">등록된 가이드 없음</div>`;
+      const plain = step.plain_language?.length
+        ? `<div class="plain"><b>쉽게 말하면</b><ul>${step.plain_language.map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ul></div>`
+        : "";
       const checkpoints = step.checkpoints?.length
         ? `<ul>${step.checkpoints.map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ul>`
         : `<div class="meta">등록된 체크포인트 없음</div>`;
@@ -727,8 +858,7 @@ HTML_TEMPLATE = """<!doctype html>
       const fieldRows = step.field_refs.map((ref) => `
         <tr>
           <td><code>${escapeHtml(ref.entity)}.${escapeHtml(ref.name)}</code></td>
-          <td>${escapeHtml(ref.type)}</td>
-          <td>${escapeHtml(ref.required)}</td>
+          <td>${escapeHtml(ref.easy_note)}</td>
           <td>${escapeHtml(ref.note)}</td>
           <td>${sourceLink(ref)}</td>
         </tr>
@@ -736,6 +866,7 @@ HTML_TEMPLATE = """<!doctype html>
       const apiRows = step.api_refs.map((ref) => `
         <tr>
           <td><code>${escapeHtml(ref.endpoint)}</code><div class="meta">${escapeHtml(ref.group)}</div></td>
+          <td>${escapeHtml(ref.easy_purpose)}</td>
           <td>${escapeHtml(ref.purpose)}</td>
           <td>${escapeHtml(ref.params)}</td>
           <td>${sourceLink(ref)}</td>
@@ -756,6 +887,7 @@ HTML_TEMPLATE = """<!doctype html>
           <span class="chip ${statusClass(step)}">${statusLabel(step)} · ${Math.round(step.coverage * 100)}%</span>
         </div>
         <div class="grid">
+          <div class="panel full"><h3>이 단계의 의미</h3>${plain}</div>
           <div class="panel full"><h3>LLM 작업자 구현 가이드</h3>${guide}</div>
           <div class="panel full"><h3>Input / Output 계약</h3>${renderContract(step.contract)}</div>
           <div class="panel"><h3>체크포인트</h3>${checkpoints}</div>
@@ -765,8 +897,8 @@ HTML_TEMPLATE = """<!doctype html>
             <table><tbody>${fileRows || "<tr><td>연결된 파일 없음</td></tr>"}</tbody></table>
           </div>
           ${missing}
-          <div class="panel full"><h3>관련 백엔드 필드</h3><table><thead><tr><th>필드</th><th>타입</th><th>필수</th><th>메모</th><th>출처</th></tr></thead><tbody>${fieldRows || "<tr><td colspan='5'>관련 필드 없음</td></tr>"}</tbody></table></div>
-          <div class="panel full"><h3>관련 백엔드 API</h3><table><thead><tr><th>엔드포인트</th><th>용도</th><th>요청값</th><th>출처</th></tr></thead><tbody>${apiRows || "<tr><td colspan='4'>관련 API 없음</td></tr>"}</tbody></table></div>
+          <div class="panel full"><h3>관련 백엔드 필드</h3><table><thead><tr><th>필드</th><th>쉽게 말하면</th><th>원문 메모</th><th>출처</th></tr></thead><tbody>${fieldRows || "<tr><td colspan='4'>관련 필드 없음</td></tr>"}</tbody></table></div>
+          <div class="panel full"><h3>관련 백엔드 API</h3><table><thead><tr><th>엔드포인트</th><th>쉽게 말하면</th><th>원문 용도</th><th>요청값</th><th>출처</th></tr></thead><tbody>${apiRows || "<tr><td colspan='5'>관련 API 없음</td></tr>"}</tbody></table></div>
           <div class="panel full"><h3>에러 코드</h3><table><thead><tr><th>코드</th><th>의미</th><th>사장님 안내</th></tr></thead><tbody>${renderErrors()}</tbody></table></div>
           <div class="panel full"><h3>표준 태그 사전</h3><table><thead><tr><th>분류</th><th>허용값</th></tr></thead><tbody>${renderDictionary()}</tbody></table></div>
           <div class="panel full"><h3>백엔드-LLM 논의 질문</h3><ul>${questions}</ul></div>
@@ -799,7 +931,8 @@ HTML_TEMPLATE = """<!doctype html>
             ? `<code>${escapeHtml(item.endpoint)}</code><div class="meta">${escapeHtml(item.group)} · API</div>`
             : `<code>${escapeHtml(item.entity)}.${escapeHtml(item.name)}</code><div class="meta">${escapeHtml(item.type)} · ${escapeHtml(item.required)}</div>`;
           const body = item.endpoint ? item.purpose : item.note;
-          return `<div class="result-row">${label}<div>${escapeHtml(body)}</div><div class="meta">${sourceLink(item)}</div></div>`;
+          const easy = item.endpoint ? item.easy_purpose : item.easy_note;
+          return `<div class="result-row">${label}<div>${escapeHtml(easy || body)}</div><div class="meta">${escapeHtml(body)}</div><div class="meta">${sourceLink(item)}</div></div>`;
         }).join("")
         : `<div class="meta">검색어를 입력하면 필드/API가 표시됩니다.</div>`;
     }
