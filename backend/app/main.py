@@ -17,6 +17,7 @@ from app.core.config import get_settings
 from app.core.database import close_engine, init_engine
 from app.core.logging import setup_logging
 from app.core.redis import close_arq_pool, close_redis, init_arq_pool, init_redis
+from app.openapi_examples import OPERATION_EXAMPLES, PARAMETER_EXAMPLES
 from app.schemas.common import ErrorResponse
 
 logger = structlog.get_logger()
@@ -175,6 +176,60 @@ def _ensure_operation_responses(operation: dict[str, Any]) -> None:
         _ensure_request_id_header(response)
 
 
+def _ensure_json_example(container: Any, value: Any) -> None:
+    if not isinstance(container, dict):
+        return
+    content = container.get("content")
+    if not isinstance(content, dict):
+        return
+    media = content.get("application/json")
+    if not isinstance(media, dict):
+        return
+    examples = media.setdefault("examples", {})
+    if not isinstance(examples, dict):
+        examples = {}
+        media["examples"] = examples
+    examples.setdefault("default", {"summary": "Example", "value": value})
+
+
+def _apply_parameter_examples(operation: dict[str, Any], operation_id: str) -> None:
+    parameter_examples = PARAMETER_EXAMPLES.get(operation_id)
+    if parameter_examples is None:
+        return
+    parameters = operation.get("parameters")
+    if not isinstance(parameters, list):
+        return
+    for parameter in parameters:
+        if not isinstance(parameter, dict):
+            continue
+        name = parameter.get("name")
+        if isinstance(name, str) and name in parameter_examples:
+            parameter.setdefault("example", parameter_examples[name])
+
+
+def _apply_operation_examples(operation: dict[str, Any]) -> None:
+    operation_id = operation.get("operationId")
+    if not isinstance(operation_id, str):
+        return
+    examples = OPERATION_EXAMPLES.get(operation_id)
+    if examples is None:
+        _apply_parameter_examples(operation, operation_id)
+        return
+
+    request_example = examples.get("request")
+    if request_example is not None:
+        _ensure_json_example(operation.get("requestBody"), request_example)
+
+    response_examples = examples.get("responses")
+    responses = operation.get("responses")
+    if isinstance(response_examples, dict) and isinstance(responses, dict):
+        for status_code, response_example in response_examples.items():
+            if isinstance(status_code, str):
+                _ensure_json_example(responses.get(status_code), response_example)
+
+    _apply_parameter_examples(operation, operation_id)
+
+
 def _iter_operations(schema: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     paths = schema.get("paths", {})
     if not isinstance(paths, dict):
@@ -208,6 +263,7 @@ def custom_openapi(app: FastAPI) -> dict[str, Any]:
         _ensure_operation_responses(operation)
         if method in _IDEMPOTENT_METHODS:
             _ensure_idempotency_key(operation)
+        _apply_operation_examples(operation)
     _remove_fastapi_validation_schemas(schemas)
 
     app.openapi_schema = schema
