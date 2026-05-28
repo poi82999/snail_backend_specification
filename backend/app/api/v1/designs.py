@@ -17,6 +17,9 @@ from app.models.enums import ActorType
 from app.schemas.designs import (
     DesignCreate,
     DesignMe,
+    DesignOptionCreate,
+    DesignOptionPublic,
+    DesignOptionUpdate,
     DesignPublic,
     DesignReanalyzeQueued,
     DesignUpdate,
@@ -193,6 +196,93 @@ async def change_visibility(
         idem.set_response(HTTPStatus.OK, response_body(response))
     await session.commit()
     return response
+
+
+@router.get("/shops/me/designs/{design_id}/options", response_model=list[DesignOptionPublic])
+async def list_design_options(
+    design_id: UUID,
+    owner_id: OwnerIdDep,
+    session: SessionDep,
+) -> list[DesignOptionPublic]:
+    return await design_service.list_design_options(session, owner_id, design_id)
+
+
+@router.post(
+    "/shops/me/designs/{design_id}/options",
+    response_model=DesignOptionPublic,
+    status_code=HTTPStatus.CREATED,
+)
+async def create_design_option(
+    request: Request,
+    design_id: UUID,
+    payload: DesignOptionCreate,
+    owner_id: OwnerIdDep,
+    idempotency_key: IdempotencyKeyDep,
+    session: SessionDep,
+) -> DesignOptionPublic | Response:
+    request_hash = await request_hash_for(request)
+    response: DesignOptionPublic
+    async with with_idempotency(
+        session, ActorType.OWNER, owner_id, idempotency_key, request_hash
+    ) as idem:
+        if idem.cached:
+            return cached_response(idem)
+        response = await design_service.create_design_option(session, owner_id, design_id, payload)
+        idem.set_response(HTTPStatus.CREATED, response_body(response))
+    await session.commit()
+    return response
+
+
+@router.patch(
+    "/shops/me/designs/{design_id}/options/{option_id}",
+    response_model=DesignOptionPublic,
+)
+async def update_design_option(
+    request: Request,
+    design_id: UUID,
+    option_id: UUID,
+    payload: DesignOptionUpdate,
+    owner_id: OwnerIdDep,
+    idempotency_key: IdempotencyKeyDep,
+    session: SessionDep,
+) -> DesignOptionPublic | Response:
+    request_hash = await request_hash_for(request)
+    response: DesignOptionPublic
+    async with with_idempotency(
+        session, ActorType.OWNER, owner_id, idempotency_key, request_hash
+    ) as idem:
+        if idem.cached:
+            return cached_response(idem)
+        response = await design_service.update_design_option(
+            session, owner_id, design_id, option_id, payload
+        )
+        idem.set_response(HTTPStatus.OK, response_body(response))
+    await session.commit()
+    return response
+
+
+@router.delete(
+    "/shops/me/designs/{design_id}/options/{option_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+)
+async def delete_design_option(
+    request: Request,
+    design_id: UUID,
+    option_id: UUID,
+    owner_id: OwnerIdDep,
+    idempotency_key: IdempotencyKeyDep,
+    session: SessionDep,
+) -> Response:
+    request_hash = await request_hash_for(request)
+    async with with_idempotency(
+        session, ActorType.OWNER, owner_id, idempotency_key, request_hash
+    ) as idem:
+        if idem.cached:
+            return cached_response(idem)
+        await design_service.delete_design_option(session, owner_id, design_id, option_id)
+        idem.set_response(HTTPStatus.NO_CONTENT, None)
+    await session.commit()
+    return Response(status_code=HTTPStatus.NO_CONTENT)
 
 
 @router.get("/designs/{design_id}", response_model=DesignPublic)

@@ -25,6 +25,12 @@ class ImageViewMode(StrEnum):
     WEAR = "wear"
 
 
+class DesignOptionKind(StrEnum):
+    EXTEND = "extend"
+    REMOVAL = "removal"
+    CARE = "care"
+
+
 class PaymentMethod(StrEnum):
     ON_SITE = "on_site"
     BANK_TRANSFER_GUIDE = "bank_transfer_guide"

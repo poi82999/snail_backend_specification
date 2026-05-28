@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import AppError
 from app.models.accounts import User
-from app.models.design import Design, DesignDesigner
+from app.models.design import Design, DesignDesigner, DesignOption
 from app.models.enums import AssignedBy, PaymentMethod, ReservationStatus
 from app.models.reservation import Reservation
 from app.models.shop import Designer, Shop
@@ -303,20 +303,55 @@ async def _ensure_user_limits(
         )
 
 
+async def _load_selected_options(
+    session: AsyncSession,
+    design_id: UUID,
+    option_ids: list[UUID],
+) -> list[DesignOption]:
+    """선택 옵션이 모두 해당 디자인 소속 + 활성인지 검증 후 반환."""
+    if not option_ids:
+        return []
+    unique_ids = list(dict.fromkeys(option_ids))
+    options = list(
+        (
+            await session.scalars(
+                select(DesignOption).where(
+                    DesignOption.id.in_(unique_ids),
+                    DesignOption.design_id == design_id,
+                    DesignOption.is_active.is_(True),
+                )
+            )
+        ).all()
+    )
+    if len(options) != len(unique_ids):
+        raise AppError(
+            "INVALID_DESIGN_OPTION",
+            "선택한 옵션이 유효하지 않습니다.",
+            HTTPStatus.UNPROCESSABLE_ENTITY,
+        )
+    return options
+
+
 async def _resolve_designer_for_slot(
     session: AsyncSession,
     design: Design,
     start_at: datetime,
     requested_designer_id: UUID | None,
+    effective_duration_minutes: int,
 ) -> tuple[UUID, AssignedBy]:
     target_date = start_at.astimezone(KST).date()
-    slots = await availability_service.calculate_available_slots(session, design.id, target_date)
+    slots = await availability_service.calculate_available_slots(
+        session,
+        design.id,
+        target_date,
+        effective_duration_minutes - design.duration_minutes,
+    )
     target_slot = next(
         (
             slot
             for slot in slots
             if slot.start_at == start_at
-            and slot.end_at == start_at + timedelta(minutes=design.duration_minutes)
+            and slot.end_at == start_at + timedelta(minutes=effective_duration_minutes)
         ),
         None,
     )
@@ -345,14 +380,20 @@ async def create_reservation(
     local_date = start_at.astimezone(KST).date()
     await _ensure_user_limits(session, user_id, shop.id, local_date)
 
+    options = await _load_selected_options(session, design.id, payload.selected_option_ids)
+    extra_duration = sum(option.duration_delta_min for option in options)
+    total_price = design.base_price + sum(option.price_delta for option in options)
+    effective_duration = design.duration_minutes + extra_duration
+
     await _lock_active_design_designers(session, design, payload.designer_id)
     designer_id, assigned_by = await _resolve_designer_for_slot(
         session,
         design,
         start_at,
         payload.designer_id,
+        effective_duration,
     )
-    end_at = start_at + timedelta(minutes=design.duration_minutes)
+    end_at = start_at + timedelta(minutes=effective_duration)
 
     status = ReservationStatus.CONFIRMED if shop.auto_accept else ReservationStatus.PENDING
     reservation = Reservation(
@@ -366,7 +407,8 @@ async def create_reservation(
         end_at=end_at,
         status=status,
         user_request=payload.user_request,
-        total_price=design.base_price,
+        selected_option_ids=[str(option.id) for option in options],
+        total_price=total_price,
         payment_method_snapshot=shop.payment_method,
         idempotency_key=idempotency_key,
     )

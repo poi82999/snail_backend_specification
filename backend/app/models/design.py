@@ -22,7 +22,13 @@ from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import AiAnalysisStatus, JobStatus, LlmJobType, Visibility
+from app.models.enums import (
+    AiAnalysisStatus,
+    DesignOptionKind,
+    JobStatus,
+    LlmJobType,
+    Visibility,
+)
 
 if TYPE_CHECKING:
     from app.models.shop import Shop
@@ -74,6 +80,23 @@ class Design(UUIDPrimaryKeyMixin, SoftDeleteMixin, TimestampMixin, Base):
     shop: Mapped[Shop] = relationship(back_populates="designs")
     images: Mapped[list[DesignImage]] = relationship(back_populates="design")
     llm_jobs: Mapped[list[LlmJob]] = relationship(back_populates="design")
+    options: Mapped[list[DesignOption]] = relationship(back_populates="design")
+
+
+class DesignOption(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "design_options"
+
+    design_id: Mapped[UUID] = mapped_column(PgUUID(as_uuid=True), ForeignKey("designs.id"))
+    kind: Mapped[DesignOptionKind] = mapped_column(
+        Enum(DesignOptionKind, native_enum=False, length=20), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(80))
+    price_delta: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    duration_delta_min: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    design: Mapped[Design] = relationship(back_populates="options")
 
 
 class DesignImage(UUIDPrimaryKeyMixin, TimestampMixin, Base):

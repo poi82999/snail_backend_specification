@@ -3,10 +3,12 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import pytest
+from app.api.errors import AppError
 from app.core.security import hash_password
 from app.models.accounts import Owner, User
-from app.models.design import Design, DesignDesigner
+from app.models.design import Design, DesignDesigner, DesignOption
 from app.models.enums import (
+    DesignOptionKind,
     PaymentMethod,
     ReservationStatus,
     VerificationStatus,
@@ -23,6 +25,7 @@ from app.models.shop import (
 from app.schemas.reservations import AvailableSlot
 from app.services.availability_service import (
     calculate_available_slots,
+    extra_duration_for_options,
     get_designer_available_slots,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -270,3 +273,63 @@ async def test_calculate_available_slots_does_not_exclude_pending_reservations(
     slots = await calculate_available_slots(db_session, design.id, target_date)
 
     assert "14:00" in _slot_starts(slots)
+
+
+@pytest.mark.asyncio
+async def test_calculate_available_slots_applies_option_extra_duration(
+    db_session: AsyncSession,
+) -> None:
+    target_date = _future_date()
+    _, _, _, design = await _availability_context(db_session, target_date)
+
+    # 60분 디자인 + 30분 옵션 = 90분 슬롯 (영업 9-18, 점심 12-13)
+    slots = await calculate_available_slots(db_session, design.id, target_date, 30)
+
+    starts = _slot_starts(slots)
+    assert "09:00" in starts
+    assert "10:30" in starts  # 90분이라 10:30 시작은 12:00 종료(점심 직전) OK
+    assert "11:00" not in starts  # 11:00 시작 → 12:30 종료인데 점심 침범
+    for slot in slots:
+        assert (slot.end_at - slot.start_at) == timedelta(minutes=90)
+
+
+@pytest.mark.asyncio
+async def test_extra_duration_for_options_sums_active_options(
+    db_session: AsyncSession,
+) -> None:
+    target_date = _future_date()
+    _, _, _, design = await _availability_context(db_session, target_date)
+    option_a = DesignOption(
+        id=uuid4(),
+        design_id=design.id,
+        kind=DesignOptionKind.EXTEND,
+        name="연장",
+        price_delta=10000,
+        duration_delta_min=30,
+    )
+    option_b = DesignOption(
+        id=uuid4(),
+        design_id=design.id,
+        kind=DesignOptionKind.REMOVAL,
+        name="제거",
+        price_delta=5000,
+        duration_delta_min=20,
+    )
+    db_session.add_all([option_a, option_b])
+    await db_session.flush()
+
+    total = await extra_duration_for_options(db_session, design.id, [option_a.id, option_b.id])
+    assert total == 50
+
+
+@pytest.mark.asyncio
+async def test_extra_duration_for_options_rejects_unknown_option(
+    db_session: AsyncSession,
+) -> None:
+    target_date = _future_date()
+    _, _, _, design = await _availability_context(db_session, target_date)
+
+    with pytest.raises(AppError) as exc_info:
+        await extra_duration_for_options(db_session, design.id, [uuid4()])
+
+    assert exc_info.value.code == "INVALID_DESIGN_OPTION"

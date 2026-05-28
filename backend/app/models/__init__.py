@@ -22,7 +22,7 @@ from app.models.community import (
     SnapSave,
     UserFollow,
 )
-from app.models.design import Design, DesignDesigner, DesignImage, LlmJob
+from app.models.design import Design, DesignDesigner, DesignImage, DesignOption, LlmJob
 from app.models.notification import NotificationDelivery, OwnerNotification
 from app.models.ops import UploadObject
 from app.models.reservation import IdempotencyKey, Reservation
@@ -43,6 +43,7 @@ __all__ = [
     "Design",
     "DesignDesigner",
     "DesignImage",
+    "DesignOption",
     "Designer",
     "DesignerSchedule",
     "DesignerTimeOff",

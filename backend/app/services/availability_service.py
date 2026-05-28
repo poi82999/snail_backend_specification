@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import AppError
-from app.models.design import Design, DesignDesigner
+from app.models.design import Design, DesignDesigner, DesignOption
 from app.models.reservation import Reservation
 from app.models.shop import Designer, DesignerSchedule, DesignerTimeOff, ShopBusinessHour
 from app.schemas.reservations import AvailableSlot
@@ -195,13 +195,44 @@ async def _designer_available_slots(
     return slots
 
 
+async def extra_duration_for_options(
+    session: AsyncSession,
+    design_id: UUID,
+    option_ids: list[UUID],
+) -> int:
+    """선택 옵션들의 소요시간 증가분 합. 유효하지 않은 옵션은 거부."""
+    if not option_ids:
+        return 0
+    unique_ids = list(dict.fromkeys(option_ids))
+    options = list(
+        (
+            await session.scalars(
+                select(DesignOption).where(
+                    DesignOption.id.in_(unique_ids),
+                    DesignOption.design_id == design_id,
+                    DesignOption.is_active.is_(True),
+                )
+            )
+        ).all()
+    )
+    if len(options) != len(unique_ids):
+        raise AppError(
+            "INVALID_DESIGN_OPTION",
+            "선택한 옵션이 유효하지 않습니다.",
+            HTTPStatus.UNPROCESSABLE_ENTITY,
+        )
+    return sum(option.duration_delta_min for option in options)
+
+
 async def calculate_available_slots(
     session: AsyncSession,
     design_id: UUID,
     target_date: date,
+    extra_duration_minutes: int = 0,
 ) -> list[AvailableSlot]:
     design = await _load_design(session, design_id)
     designers = await _active_design_designers(session, design)
+    duration_minutes = design.duration_minutes + extra_duration_minutes
     grouped: dict[tuple[datetime, datetime], set[UUID]] = {}
 
     for designer in designers:
@@ -209,7 +240,7 @@ async def calculate_available_slots(
             session,
             designer,
             target_date,
-            design.duration_minutes,
+            duration_minutes,
         )
         for slot in slots:
             grouped.setdefault((slot.start_at, slot.end_at), set()).add(designer.id)

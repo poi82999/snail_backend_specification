@@ -14,7 +14,7 @@ from app.api.errors import AppError
 from app.core.redis import get_arq_pool
 from app.models.accounts import Owner
 from app.models.community import FavoriteDesign, Review
-from app.models.design import Design, DesignDesigner, DesignImage, LlmJob
+from app.models.design import Design, DesignDesigner, DesignImage, DesignOption, LlmJob
 from app.models.enums import (
     ActorType,
     AiAnalysisStatus,
@@ -29,6 +29,9 @@ from app.schemas.designs import (
     DesignDesignerPublic,
     DesignImagePublic,
     DesignMe,
+    DesignOptionCreate,
+    DesignOptionPublic,
+    DesignOptionUpdate,
     DesignPublic,
     DesignShopSummary,
     DesignUpdate,
@@ -217,6 +220,31 @@ async def _design_designers(
     return by_design
 
 
+async def _design_options(
+    session: AsyncSession,
+    design_ids: list[UUID],
+) -> dict[UUID, list[DesignOption]]:
+    if not design_ids:
+        return {}
+    options = list(
+        (
+            await session.scalars(
+                select(DesignOption)
+                .where(DesignOption.design_id.in_(design_ids))
+                .order_by(DesignOption.sort_order, DesignOption.id)
+            )
+        ).all()
+    )
+    by_design: dict[UUID, list[DesignOption]] = {design_id: [] for design_id in design_ids}
+    for option in options:
+        by_design.setdefault(option.design_id, []).append(option)
+    return by_design
+
+
+def _option_public(option: DesignOption) -> DesignOptionPublic:
+    return DesignOptionPublic.model_validate(option)
+
+
 async def _latest_llm_jobs(session: AsyncSession, design_ids: list[UUID]) -> dict[UUID, LlmJob]:
     if not design_ids:
         return {}
@@ -271,6 +299,7 @@ async def _to_design_me(session: AsyncSession, designs: list[Design]) -> list[De
     design_ids = [design.id for design in designs]
     images_by_design = await _design_images(session, design_ids)
     designers_by_design = await _design_designers(session, design_ids)
+    options_by_design = await _design_options(session, design_ids)
     latest_jobs = await _latest_llm_jobs(session, design_ids)
 
     result: list[DesignMe] = []
@@ -302,6 +331,7 @@ async def _to_design_me(session: AsyncSession, designs: list[Design]) -> list[De
                     _designer_public(designer)
                     for designer in designers_by_design.get(design.id, [])
                 ],
+                options=[_option_public(option) for option in options_by_design.get(design.id, [])],
                 llm_jobs=[_llm_job_summary(latest_job)] if latest_job is not None else [],
                 deleted_at=design.deleted_at,
                 created_at=design.created_at,
@@ -387,6 +417,7 @@ async def public_design_rows(
     designers_by_design = await _design_designers(
         session, [design.id for design in ordered_designs]
     )
+    options_by_design = await _design_options(session, [design.id for design in ordered_designs])
 
     result: list[DesignPublic] = []
     for design in ordered_designs:
@@ -413,6 +444,11 @@ async def public_design_rows(
                 designers=[
                     _designer_public(designer)
                     for designer in designers_by_design.get(design.id, [])
+                ],
+                options=[
+                    _option_public(option)
+                    for option in options_by_design.get(design.id, [])
+                    if option.is_active
                 ],
                 average_rating=average_rating,
                 favorite_count=favorite_count,
@@ -575,3 +611,95 @@ async def get_public_design(
     if not designs:
         raise AppError("DESIGN_NOT_FOUND", "디자인을 찾을 수 없습니다.", HTTPStatus.NOT_FOUND)
     return designs[0]
+
+
+MAX_DESIGN_OPTIONS = 20
+
+
+async def _get_owner_design_option(
+    session: AsyncSession,
+    owner_id: UUID,
+    design_id: UUID,
+    option_id: UUID,
+) -> DesignOption:
+    await _get_owner_design(session, owner_id, design_id)
+    option = await session.scalar(
+        select(DesignOption).where(
+            DesignOption.id == option_id,
+            DesignOption.design_id == design_id,
+        )
+    )
+    if option is None:
+        raise AppError("DESIGN_OPTION_NOT_FOUND", "옵션을 찾을 수 없습니다.", HTTPStatus.NOT_FOUND)
+    return option
+
+
+async def list_design_options(
+    session: AsyncSession,
+    owner_id: UUID,
+    design_id: UUID,
+) -> list[DesignOptionPublic]:
+    await _get_owner_design(session, owner_id, design_id)
+    options = (await _design_options(session, [design_id])).get(design_id, [])
+    return [_option_public(option) for option in options]
+
+
+async def create_design_option(
+    session: AsyncSession,
+    owner_id: UUID,
+    design_id: UUID,
+    payload: DesignOptionCreate,
+) -> DesignOptionPublic:
+    await _get_owner_design(session, owner_id, design_id)
+    count = await session.scalar(
+        select(func.count()).select_from(DesignOption).where(DesignOption.design_id == design_id)
+    )
+    if int(count or 0) >= MAX_DESIGN_OPTIONS:
+        raise AppError(
+            "TOO_MANY_DESIGN_OPTIONS",
+            f"옵션은 최대 {MAX_DESIGN_OPTIONS}개까지 등록할 수 있습니다.",
+            HTTPStatus.BAD_REQUEST,
+        )
+    option = DesignOption(
+        id=uuid4(),
+        design_id=design_id,
+        kind=payload.kind,
+        name=payload.name,
+        price_delta=payload.price_delta,
+        duration_delta_min=payload.duration_delta_min,
+        sort_order=payload.sort_order,
+    )
+    session.add(option)
+    await session.flush()
+    logger.info("design.option_created", design_id=str(design_id), option_id=str(option.id))
+    return _option_public(option)
+
+
+async def update_design_option(
+    session: AsyncSession,
+    owner_id: UUID,
+    design_id: UUID,
+    option_id: UUID,
+    payload: DesignOptionUpdate,
+) -> DesignOptionPublic:
+    option = await _get_owner_design_option(session, owner_id, design_id, option_id)
+    for field in ("kind", "name", "price_delta", "duration_delta_min", "sort_order", "is_active"):
+        if field in payload.model_fields_set:
+            value = getattr(payload, field)
+            if value is not None:
+                setattr(option, field, value)
+    await session.flush()
+    logger.info("design.option_updated", design_id=str(design_id), option_id=str(option_id))
+    return _option_public(option)
+
+
+async def delete_design_option(
+    session: AsyncSession,
+    owner_id: UUID,
+    design_id: UUID,
+    option_id: UUID,
+) -> None:
+    option = await _get_owner_design_option(session, owner_id, design_id, option_id)
+    await session.delete(option)
+    await session.flush()
+    logger.info("design.option_deleted", design_id=str(design_id), option_id=str(option_id))

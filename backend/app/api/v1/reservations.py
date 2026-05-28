@@ -49,8 +49,14 @@ async def get_design_availability(
     design_id: UUID,
     session: SessionDep,
     target_date: Annotated[date, Query(alias="date")],
+    option_ids: Annotated[list[UUID] | None, Query()] = None,
 ) -> list[AvailableSlot]:
-    return await availability_service.calculate_available_slots(session, design_id, target_date)
+    extra_duration = await availability_service.extra_duration_for_options(
+        session, design_id, option_ids or []
+    )
+    return await availability_service.calculate_available_slots(
+        session, design_id, target_date, extra_duration
+    )
 
 
 @router.post("/reservations", response_model=ReservationMe, status_code=HTTPStatus.CREATED)

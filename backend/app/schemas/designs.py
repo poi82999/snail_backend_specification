@@ -2,9 +2,44 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import AiAnalysisStatus, JobStatus, LlmJobType, Visibility
+from app.models.enums import (
+    AiAnalysisStatus,
+    DesignOptionKind,
+    JobStatus,
+    LlmJobType,
+    Visibility,
+)
+
+
+class DesignOptionCreate(BaseModel):
+    kind: DesignOptionKind
+    name: str = Field(min_length=1, max_length=80)
+    price_delta: int = Field(default=0, ge=0)
+    duration_delta_min: int = Field(default=0, ge=0, le=600)
+    sort_order: int = 0
+
+
+class DesignOptionUpdate(BaseModel):
+    kind: DesignOptionKind | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    price_delta: int | None = Field(default=None, ge=0)
+    duration_delta_min: int | None = Field(default=None, ge=0, le=600)
+    sort_order: int | None = None
+    is_active: bool | None = None
+
+
+class DesignOptionPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    kind: DesignOptionKind
+    name: str
+    price_delta: int
+    duration_delta_min: int
+    sort_order: int
+    is_active: bool
 
 
 class DesignCreate(BaseModel):
@@ -86,6 +121,7 @@ class DesignMe(BaseModel):
     search_indexed_at: datetime | None = None
     images: list[DesignImagePublic] = Field(default_factory=list)
     designers: list[DesignDesignerPublic] = Field(default_factory=list)
+    options: list[DesignOptionPublic] = Field(default_factory=list)
     llm_jobs: list[LlmJobSummary] = Field(default_factory=list, max_length=1)
     deleted_at: datetime | None = None
     created_at: datetime
@@ -113,6 +149,7 @@ class DesignPublic(BaseModel):
     nail_shape: str | None = None
     shop: DesignShopSummary
     designers: list[DesignDesignerPublic] = Field(default_factory=list)
+    options: list[DesignOptionPublic] = Field(default_factory=list)
     average_rating: float
     favorite_count: int
     favorited_by_me: bool

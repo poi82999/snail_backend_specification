@@ -9,6 +9,7 @@ from app.models.enums import AssignedBy, PaymentMethod, ReservationStatus
 class AvailabilityQuery(BaseModel):
     design_id: UUID
     date: date
+    option_ids: list[UUID] = Field(default_factory=list)
 
 
 class AvailableSlot(BaseModel):
@@ -21,6 +22,7 @@ class ReservationCreate(BaseModel):
     design_id: UUID
     start_at: datetime
     designer_id: UUID | None = None
+    selected_option_ids: list[UUID] = Field(default_factory=list)
     user_request: str | None = Field(default=None, max_length=200)
 
     @field_validator("start_at")
@@ -71,6 +73,7 @@ class ReservationMe(BaseModel):
     end_at: datetime
     status: ReservationStatus
     user_request: str | None = None
+    selected_option_ids: list[UUID] = Field(default_factory=list)
     total_price: int
     payment_method_snapshot: PaymentMethod
     deposit_amount_snapshot: int | None = None

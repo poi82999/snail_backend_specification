@@ -35,6 +35,7 @@ class Reservation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
     )
     user_request: Mapped[str | None] = mapped_column(Text)
+    selected_option_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
     total_price: Mapped[int] = mapped_column(Integer)
     payment_method_snapshot: Mapped[PaymentMethod] = mapped_column(
         Enum(PaymentMethod, native_enum=False, length=40), nullable=False
