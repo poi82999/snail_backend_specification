@@ -20,6 +20,11 @@ class Visibility(StrEnum):
     HIDDEN = "hidden"
 
 
+class ImageViewMode(StrEnum):
+    MODEL = "model"
+    WEAR = "wear"
+
+
 class PaymentMethod(StrEnum):
     ON_SITE = "on_site"
     BANK_TRANSFER_GUIDE = "bank_transfer_guide"

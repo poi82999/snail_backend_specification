@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import VerificationStatus
+from app.models.enums import ImageViewMode, VerificationStatus
 
 if TYPE_CHECKING:
     from app.models.shop import Shop
@@ -25,6 +25,12 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     profile_image_url: Mapped[str | None] = mapped_column(Text)
     bio: Mapped[str | None] = mapped_column(String(200))
     interest_tags: Mapped[list[str]] = mapped_column(ARRAY(String(40)), default=list)
+    image_view_mode: Mapped[ImageViewMode] = mapped_column(
+        Enum(ImageViewMode, native_enum=False, length=10),
+        default=ImageViewMode.MODEL,
+        server_default=ImageViewMode.MODEL.name,
+        nullable=False,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     apns_tokens: Mapped[list[UserDeviceToken]] = relationship(back_populates="user")

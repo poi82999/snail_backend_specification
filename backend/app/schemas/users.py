@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.enums import ImageViewMode
+
 
 class UserMe(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -13,6 +15,7 @@ class UserMe(BaseModel):
     profile_image_url: str | None = None
     bio: str | None = None
     interest_tags: list[str]
+    image_view_mode: ImageViewMode
     created_at: datetime
 
 
@@ -30,6 +33,7 @@ class UserUpdate(BaseModel):
     bio: str | None = Field(default=None, max_length=200)
     profile_image_url: str | None = None
     interest_tags: list[str] | None = None
+    image_view_mode: ImageViewMode | None = None
 
 
 class DeviceTokenRegister(BaseModel):

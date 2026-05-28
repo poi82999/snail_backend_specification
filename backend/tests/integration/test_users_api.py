@@ -26,3 +26,45 @@ async def test_patch_me_updates_nickname(api_client: AsyncClient, user_token: st
 
     assert response.status_code == 200
     assert response.json()["nickname"] == nickname
+
+
+@pytest.mark.asyncio
+async def test_me_defaults_image_view_mode_model(api_client: AsyncClient, user_token: str) -> None:
+    response = await api_client.get(
+        "/api/v1/me",
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["image_view_mode"] == "model"
+
+
+@pytest.mark.asyncio
+async def test_patch_me_updates_image_view_mode(api_client: AsyncClient, user_token: str) -> None:
+    response = await api_client.patch(
+        "/api/v1/me",
+        json={"image_view_mode": "wear"},
+        headers={
+            "Authorization": f"Bearer {user_token}",
+            "Idempotency-Key": f"user-mode-{uuid4()}",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["image_view_mode"] == "wear"
+
+
+@pytest.mark.asyncio
+async def test_patch_me_rejects_invalid_image_view_mode(
+    api_client: AsyncClient, user_token: str
+) -> None:
+    response = await api_client.patch(
+        "/api/v1/me",
+        json={"image_view_mode": "invalid"},
+        headers={
+            "Authorization": f"Bearer {user_token}",
+            "Idempotency-Key": f"user-mode-bad-{uuid4()}",
+        },
+    )
+
+    assert response.status_code == 422

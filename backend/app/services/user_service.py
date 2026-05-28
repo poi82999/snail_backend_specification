@@ -38,6 +38,8 @@ async def update_me(session: AsyncSession, user_id: UUID, payload: UserUpdate) -
         user.profile_image_url = payload.profile_image_url
     if payload.interest_tags is not None:
         user.interest_tags = payload.interest_tags
+    if payload.image_view_mode is not None:
+        user.image_view_mode = payload.image_view_mode
 
     await session.flush()
     return user
