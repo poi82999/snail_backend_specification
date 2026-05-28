@@ -1,8 +1,9 @@
+from decimal import Decimal, InvalidOperation
 from http import HTTPStatus
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_owner_id, db_session
@@ -145,6 +146,47 @@ async def delete_my_shop_image(
         idem.set_response(HTTPStatus.NO_CONTENT, None)
     await session.commit()
     return Response(status_code=HTTPStatus.NO_CONTENT)
+
+
+def _parse_bbox(bbox: str | None) -> tuple[Decimal, Decimal, Decimal, Decimal] | None:
+    if bbox is None:
+        return None
+    parts = bbox.split(",")
+    if len(parts) != 4:
+        raise AppError(
+            "INVALID_BBOX",
+            "bbox는 'minLng,minLat,maxLng,maxLat' 형식이어야 합니다.",
+            HTTPStatus.BAD_REQUEST,
+        )
+    try:
+        min_lng, min_lat, max_lng, max_lat = (Decimal(p.strip()) for p in parts)
+    except (InvalidOperation, ValueError) as exc:
+        raise AppError(
+            "INVALID_BBOX",
+            "bbox 좌표를 해석할 수 없습니다.",
+            HTTPStatus.BAD_REQUEST,
+        ) from exc
+    if min_lng > max_lng or min_lat > max_lat:
+        raise AppError(
+            "INVALID_BBOX",
+            "bbox의 최소 좌표는 최대 좌표보다 작아야 합니다.",
+            HTTPStatus.BAD_REQUEST,
+        )
+    return min_lng, min_lat, max_lng, max_lat
+
+
+@router.get("/shops", response_model=list[ShopPublic])
+async def list_public_shops(
+    session: SessionDep,
+    bbox: Annotated[str | None, Query()] = None,
+    location_tag: Annotated[str | None, Query()] = None,
+) -> list[ShopPublic]:
+    shops = await shop_service.list_public_shops(
+        session,
+        bbox=_parse_bbox(bbox),
+        location_tag=location_tag,
+    )
+    return [ShopPublic.from_shop(shop) for shop in shops]
 
 
 @router.get("/shops/{shop_id}", response_model=ShopPublic)

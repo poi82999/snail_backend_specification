@@ -1,4 +1,5 @@
 from datetime import time
+from decimal import Decimal
 from http import HTTPStatus
 from uuid import UUID, uuid4
 
@@ -20,6 +21,7 @@ from app.models.enums import (
 from app.models.ops import UploadObject
 from app.models.shop import Shop, ShopBusinessHour, ShopImage
 from app.schemas.shops import BusinessHourEntry, ShopCreate, ShopImageCreate, ShopUpdate
+from app.services.location_tags import validate_location_tags
 from app.services.owner_service import get_me
 from app.services.reservation_policy import validate_shop_payment_policy
 from app.utils.storage import upload_public_url
@@ -95,6 +97,7 @@ async def create_shop(session: AsyncSession, owner_id: UUID, payload: ShopCreate
 
     validate_shop_payment_policy(payload.auto_accept, payload.payment_method)
     _validate_payment_storage(payload.payment_method, payload.deposit_amount)
+    location_tags = validate_location_tags(payload.location_tags)
 
     shop = Shop(
         id=uuid4(),
@@ -103,6 +106,7 @@ async def create_shop(session: AsyncSession, owner_id: UUID, payload: ShopCreate
         address=payload.address,
         address_detail=payload.address_detail,
         region=payload.region,
+        location_tags=location_tags,
         latitude=payload.latitude,
         longitude=payload.longitude,
         phone_number=payload.phone_number,
@@ -151,6 +155,9 @@ async def update_shop(session: AsyncSession, owner_id: UUID, payload: ShopUpdate
 
     validate_shop_payment_policy(auto_accept, payment_method)
     _validate_payment_storage(payment_method, deposit_amount)
+
+    if payload.location_tags is not None:
+        shop.location_tags = validate_location_tags(payload.location_tags)
 
     for field in (
         "name",
@@ -338,3 +345,40 @@ async def get_public_shop(session: AsyncSession, shop_id: UUID) -> Shop:
     if shop is None:
         raise AppError("SHOP_NOT_FOUND", "샵을 찾을 수 없습니다.", HTTPStatus.NOT_FOUND)
     return shop
+
+
+MAX_NEARBY_SHOPS = 100
+
+
+async def list_public_shops(
+    session: AsyncSession,
+    *,
+    bbox: tuple[Decimal, Decimal, Decimal, Decimal] | None = None,
+    location_tag: str | None = None,
+) -> list[Shop]:
+    """주변 탭 — viewport(bbox) 또는 위치 태그로 공개 샵 조회. 줌 기반(고정 반경 미사용)."""
+    statement = (
+        select(Shop)
+        .join(Owner, Owner.id == Shop.owner_id)
+        .where(
+            Shop.visibility == Visibility.ACTIVE,
+            Owner.verification_status == VerificationStatus.APPROVED,
+            Owner.is_active.is_(True),
+        )
+        .options(selectinload(Shop.images), selectinload(Shop.business_hours))
+    )
+
+    if bbox is not None:
+        min_lng, min_lat, max_lng, max_lat = bbox
+        statement = statement.where(
+            Shop.latitude.is_not(None),
+            Shop.longitude.is_not(None),
+            Shop.latitude.between(min_lat, max_lat),
+            Shop.longitude.between(min_lng, max_lng),
+        )
+
+    if location_tag is not None:
+        statement = statement.where(Shop.location_tags.contains([location_tag]))
+
+    statement = statement.order_by(Shop.favorite_count.desc(), Shop.id).limit(MAX_NEARBY_SHOPS)
+    return list((await session.scalars(statement)).all())

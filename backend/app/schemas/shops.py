@@ -14,6 +14,7 @@ class ShopCreate(BaseModel):
     address: str = Field(min_length=1)
     address_detail: str | None = None
     region: str | None = Field(default=None, max_length=80)
+    location_tags: list[str] = Field(default_factory=list, max_length=3)
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     phone_number: str = Field(min_length=1, max_length=30)
@@ -32,6 +33,7 @@ class ShopUpdate(BaseModel):
     address: str | None = Field(default=None, min_length=1)
     address_detail: str | None = None
     region: str | None = Field(default=None, max_length=80)
+    location_tags: list[str] | None = Field(default=None, max_length=3)
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     phone_number: str | None = Field(default=None, min_length=1, max_length=30)
@@ -82,6 +84,7 @@ class ShopMe(BaseModel):
     address: str
     address_detail: str | None = None
     region: str | None = None
+    location_tags: list[str] = Field(default_factory=list)
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     phone_number: str
@@ -115,6 +118,7 @@ class ShopMe(BaseModel):
             address=shop.address,
             address_detail=shop.address_detail,
             region=shop.region,
+            location_tags=list(shop.location_tags),
             latitude=shop.latitude,
             longitude=shop.longitude,
             phone_number=shop.phone_number,
@@ -147,6 +151,7 @@ class ShopPublic(BaseModel):
     address: str
     address_detail: str | None = None
     region: str | None = None
+    location_tags: list[str] = Field(default_factory=list)
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     phone_number: str
@@ -174,6 +179,7 @@ class ShopPublic(BaseModel):
             address=shop.address,
             address_detail=shop.address_detail,
             region=shop.region,
+            location_tags=list(shop.location_tags),
             latitude=shop.latitude,
             longitude=shop.longitude,
             phone_number=shop.phone_number,

@@ -136,3 +136,78 @@ async def test_approved_owner_shop_happy_path_and_idempotency(
         headers=_auth_headers(owner_token, f"shop-hours-{uuid4()}"),
     )
     assert hours_response.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_shop_create_with_valid_location_tags(
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+    owner_token: str,
+) -> None:
+    await _approve_owner(db_session, owner_token)
+    response = await api_client.post(
+        "/api/v1/shops/me",
+        json={**SHOP_PAYLOAD, "location_tags": ["홍대", "성수"]},
+        headers=_auth_headers(owner_token, f"shop-create-{uuid4()}"),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["location_tags"] == ["홍대", "성수"]
+
+
+@pytest.mark.asyncio
+async def test_shop_create_rejects_invalid_location_tag(
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+    owner_token: str,
+) -> None:
+    await _approve_owner(db_session, owner_token)
+    response = await api_client.post(
+        "/api/v1/shops/me",
+        json={**SHOP_PAYLOAD, "location_tags": ["없는동네"]},
+        headers=_auth_headers(owner_token, f"shop-create-{uuid4()}"),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_LOCATION_TAG"
+
+
+@pytest.mark.asyncio
+async def test_list_public_shops_filters_by_location_tag(
+    api_client: AsyncClient,
+    db_session: AsyncSession,
+    owner_token: str,
+) -> None:
+    from app.models.enums import Visibility
+    from app.models.shop import Shop
+
+    owner = await _approve_owner(db_session, owner_token)
+    create_response = await api_client.post(
+        "/api/v1/shops/me",
+        json={**SHOP_PAYLOAD, "location_tags": ["연남"]},
+        headers=_auth_headers(owner_token, f"shop-create-{uuid4()}"),
+    )
+    assert create_response.status_code == 201
+    shop_id = create_response.json()["id"]
+
+    shop = await db_session.get(Shop, UUID(shop_id))
+    assert shop is not None
+    shop.visibility = Visibility.ACTIVE
+    await db_session.flush()
+
+    response = await api_client.get("/api/v1/shops", params={"location_tag": "연남"})
+    assert response.status_code == 200
+    ids = [item["id"] for item in response.json()]
+    assert shop_id in ids
+    assert all("연남" in item["location_tags"] for item in response.json())
+
+    # owner는 한 개만 만들었고 seed 샵은 위치 태그가 비어 있어 매칭되지 않아야 함
+    assert len(response.json()) == 1
+    _ = owner
+
+
+@pytest.mark.asyncio
+async def test_list_public_shops_rejects_malformed_bbox(api_client: AsyncClient) -> None:
+    response = await api_client.get("/api/v1/shops", params={"bbox": "1,2,3"})
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_BBOX"

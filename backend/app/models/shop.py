@@ -39,6 +39,7 @@ class Shop(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     address: Mapped[str] = mapped_column(Text)
     address_detail: Mapped[str | None] = mapped_column(Text)
     region: Mapped[str | None] = mapped_column(String(80))
+    location_tags: Mapped[list[str]] = mapped_column(ARRAY(String(40)), default=list)
     latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
     longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
     phone_number: Mapped[str] = mapped_column(String(30))
