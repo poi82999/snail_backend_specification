@@ -1,0 +1,44 @@
+# 운영 (GCE) 용 Caddyfile — 도메인 결정 후 example.com 자리만 교체
+# 로컬 개발에서는 API 컨테이너에 직접 접근하므로 Caddy 불필요
+
+{$API_DOMAIN} {
+    encode gzip zstd
+
+    # 보안 헤더
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # 헬스체크는 노출 OK
+    handle /api/v1/health {
+        reverse_proxy api:8000
+    }
+
+    # OpenAPI 문서는 prod에서 비공개 (FastAPI에서 None 처리)
+    handle /docs* {
+        respond 404
+    }
+    handle /openapi.json {
+        respond 404
+    }
+
+    # 그 외 API 트래픽
+    handle {
+        reverse_proxy api:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    log {
+        output stdout
+        format json
+        level INFO
+    }
+}

@@ -1,0 +1,29 @@
+# gitleaks 추가 규칙 — 프로젝트 특화 시크릿 패턴
+[extend]
+useDefault = true
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API key"
+regex = '''sk-(proj-)?[A-Za-z0-9]{20,}'''
+tags = ["key", "openai"]
+
+[[rules]]
+id = "gcp-service-account-private-key"
+description = "GCP service account JSON private key"
+regex = '''"private_key"\s*:\s*"-----BEGIN PRIVATE KEY-----'''
+tags = ["key", "gcp"]
+
+[[rules]]
+id = "kakao-rest-api-key"
+description = "Kakao REST API key"
+regex = '''KakaoAK\s+[A-Za-z0-9]{32}'''
+tags = ["key", "kakao"]
+
+[allowlist]
+description = "허용 경로/파일"
+paths = [
+    '''\.env\.example$''',
+    '''README\.md$''',
+    '''docs/.*''',
+]

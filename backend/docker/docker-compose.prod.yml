@@ -1,0 +1,66 @@
+# 운영(GCE) — 이미지는 GCR에서 pull, DB는 Cloud SQL Auth Proxy 통해 접근
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+  api:
+    image: gcr.io/${GCP_PROJECT_ID}/snail-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: /opt/snail/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      cloud-sql-proxy:
+        condition: service_started
+    expose:
+      - "8000"
+
+  worker:
+    image: gcr.io/${GCP_PROJECT_ID}/snail-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: /opt/snail/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      cloud-sql-proxy:
+        condition: service_started
+    command: ["arq", "app.workers.main.WorkerSettings"]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  cloud-sql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.13.0
+    restart: unless-stopped
+    command:
+      - "--private-ip"
+      - "--port=5432"
+      - "${CLOUD_SQL_INSTANCE_CONNECTION_NAME}"
+    expose:
+      - "5432"
+
+volumes:
+  caddy_data:
+  caddy_config:
+  redis_data:

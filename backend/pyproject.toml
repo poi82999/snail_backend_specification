@@ -1,0 +1,53 @@
+[project]
+name = "snail-backend"
+version = "0.1.0"
+description = "Snail nail reservation + community backend (MVP)"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle / pyflakes
+    "I",             # isort
+    "B",             # bugbear
+    "UP",            # pyupgrade
+    "ASYNC",         # async
+    "S",             # bandit (security)
+    "RUF",           # ruff-specific
+]
+ignore = [
+    "E501",          # line length (formatter handles)
+    "S101",          # assert in tests OK
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B"]
+"alembic/**" = ["E", "F", "I"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["alembic/versions"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --cov=app --cov-report=term-missing"
+markers = [
+    "integration: requires database/redis",
+    "e2e: cross-domain end-to-end scenarios",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/main.py", "alembic/*"]

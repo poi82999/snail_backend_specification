@@ -1,0 +1,4 @@
+api.example.com {
+  reverse_proxy api:8000
+  encode gzip zstd
+}
