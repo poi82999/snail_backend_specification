@@ -297,6 +297,12 @@
         "예약 시점 총액 스냅샷"
       ],
       [
+        "selected_option_ids",
+        "UUID[]",
+        "선택",
+        "예약 시 유저가 선택한 디자인 옵션 ID 목록. 옵션 가격/소요시간 delta가 total_price/end_datetime 계산에 반영됨"
+      ],
+      [
         "reservation_policy_snapshot",
         "JSON",
         "자동",
@@ -473,6 +479,11 @@
         "q, region, lat, lng, radius, sort, cursor"
       ],
       [
+        "GET /shops",
+        "공개 샵 목록/지도 뷰포트 조회. bbox와 location_tag로 현재 지도 영역 또는 지역 태그에 맞는 샵을 반환",
+        "bbox(minLng,minLat,maxLng,maxLat), location_tag"
+      ],
+      [
         "GET /reviews/search",
         "리뷰 검색",
         "q, tags[]"
@@ -517,7 +528,7 @@
       [
         "POST /reservations",
         "예약 요청 생성",
-        "design_id, designer_id?, start_datetime, user_request_memo, Idempotency-Key header"
+        "design_id, designer_id?, start_datetime, selected_option_ids?, user_request_memo, Idempotency-Key header"
       ],
       [
         "GET /reservations/me",

@@ -24,7 +24,11 @@ UserIdDep = Annotated[UUID, Depends(current_user_id)]
 IdempotencyKeyDep = Annotated[str, Depends(required_idempotency_key)]
 
 
-@router.post("/designs/{design_id}/favorite", response_model=LikeToggleResponse)
+@router.post(
+    "/designs/{design_id}/favorite",
+    response_model=LikeToggleResponse,
+    summary="디자인 즐겨찾기 토글",
+)
 async def toggle_design_favorite(
     request: Request,
     design_id: UUID,

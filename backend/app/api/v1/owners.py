@@ -29,13 +29,21 @@ OwnerIdDep = Annotated[UUID, Depends(current_owner_id)]
 IdempotencyKeyDep = Annotated[str, Depends(required_idempotency_key)]
 
 
-@router.get("/owners/me", response_model=OwnerMe)
+@router.get(
+    "/owners/me",
+    response_model=OwnerMe,
+    summary="내 사장님 정보 조회",
+)
 async def get_me(owner_id: OwnerIdDep, session: SessionDep) -> OwnerMe:
     owner = await owner_service.get_me(session, owner_id)
     return OwnerMe.model_validate(owner)
 
 
-@router.patch("/owners/me", response_model=OwnerMe)
+@router.patch(
+    "/owners/me",
+    response_model=OwnerMe,
+    summary="내 사장님 정보 수정",
+)
 async def update_me(
     request: Request,
     payload: OwnerUpdate,
@@ -61,6 +69,7 @@ async def update_me(
     "/owners/me/business-verification",
     response_model=BusinessVerificationMe,
     status_code=HTTPStatus.CREATED,
+    summary="사업자 인증 제출",
 )
 async def submit_business_verification(
     request: Request,
@@ -83,7 +92,11 @@ async def submit_business_verification(
     return response
 
 
-@router.get("/owners/me/business-verification", response_model=BusinessVerificationMe)
+@router.get(
+    "/owners/me/business-verification",
+    response_model=BusinessVerificationMe,
+    summary="최근 사업자 인증 조회",
+)
 async def get_latest_business_verification(
     owner_id: OwnerIdDep, session: SessionDep
 ) -> BusinessVerificationMe:

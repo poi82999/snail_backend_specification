@@ -15,7 +15,10 @@ class UserMe(BaseModel):
     profile_image_url: str | None = None
     bio: str | None = None
     interest_tags: list[str]
-    image_view_mode: ImageViewMode
+    image_view_mode: ImageViewMode = Field(
+        description="이미지 보기 방식. 허용값: model, wear.",
+        examples=["model", "wear"],
+    )
     created_at: datetime
 
 
@@ -33,7 +36,11 @@ class UserUpdate(BaseModel):
     bio: str | None = Field(default=None, max_length=200)
     profile_image_url: str | None = None
     interest_tags: list[str] | None = None
-    image_view_mode: ImageViewMode | None = None
+    image_view_mode: ImageViewMode | None = Field(
+        default=None,
+        description="이미지 보기 방식. 허용값: model, wear.",
+        examples=["wear"],
+    )
 
 
 class DeviceTokenRegister(BaseModel):

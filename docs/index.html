@@ -42,7 +42,7 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
     }
-    a.card {
+    .card {
       display: block;
       border: 1px solid var(--line);
       background: var(--panel);
@@ -64,6 +64,25 @@
       line-height: 1.5;
       font-size: 13px;
     }
+    .card-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .card-links a {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 8px;
+      text-decoration: none;
+    }
+    .card-links a:hover {
+      border-color: var(--accent);
+      background: var(--accent-weak);
+    }
     @media (max-width: 720px) {
       .grid { grid-template-columns: 1fr; }
     }
@@ -74,13 +93,29 @@
     <h1>Snail Backend Collaboration Index</h1>
     <p>프론트엔드, LLM 작업자, 백엔드 협업자가 같은 백엔드 명세를 빠르게 찾아볼 수 있도록 만든 정적 HTML 인덱스입니다.</p>
     <div class="grid">
+      <a class="card" href="api_reference.html">
+        <div class="title">앱/유저 ↔ 백엔드</div>
+        <div class="desc">유저 앱 API, 인증, 예약, 스네일, 리뷰 계약을 OpenAPI 기준으로 확인합니다.</div>
+      </a>
       <a class="card" href="owner_webapp_backend_index.html">
         <div class="title">사장님 웹앱 ↔ 백엔드</div>
-        <div class="desc">사장님 웹앱 기능명세 기준으로 관련 백엔드 필드, API, 구현 체크포인트를 찾습니다.</div>
+        <div class="desc">사장님 웹 기능명세 기준으로 관련 백엔드 필드, API, 구현 체크포인트를 찾습니다.</div>
       </a>
       <a class="card" href="llm_pipeline_backend_index.html">
         <div class="title">LLM 파이프라인 ↔ 백엔드</div>
         <div class="desc">Transform/Classify 계약, 에러 코드, 표준 태그 사전, 저장 필드를 연결해 확인합니다.</div>
+      </a>
+      <div class="card">
+        <div class="title">API 계약</div>
+        <div class="desc">OpenAPI codegen 입력과 에러코드·인증·페이지네이션 레퍼런스를 함께 확인합니다.</div>
+        <div class="card-links">
+          <a href="api_reference.html">OpenAPI</a>
+          <a href="api_contract_reference.html">에러코드 레퍼런스</a>
+        </div>
+      </div>
+      <a class="card" href="local_onboarding.md">
+        <div class="title">로컬 온보딩</div>
+        <div class="desc">Docker 기동, base URL, 개발 토큰 발급, CORS, Idempotency-Key 규칙을 확인합니다.</div>
       </a>
     </div>
   </main>

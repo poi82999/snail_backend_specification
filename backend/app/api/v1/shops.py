@@ -34,7 +34,12 @@ OwnerIdDep = Annotated[UUID, Depends(current_owner_id)]
 IdempotencyKeyDep = Annotated[str, Depends(required_idempotency_key)]
 
 
-@router.post("/shops/me", response_model=ShopMe, status_code=HTTPStatus.CREATED)
+@router.post(
+    "/shops/me",
+    response_model=ShopMe,
+    status_code=HTTPStatus.CREATED,
+    summary="내 샵 생성",
+)
 async def create_my_shop(
     request: Request,
     payload: ShopCreate,
@@ -56,7 +61,11 @@ async def create_my_shop(
     return response
 
 
-@router.get("/shops/me", response_model=ShopMe)
+@router.get(
+    "/shops/me",
+    response_model=ShopMe,
+    summary="내 샵 조회",
+)
 async def get_my_shop(owner_id: OwnerIdDep, session: SessionDep) -> ShopMe:
     shop = await shop_service.get_my_shop(session, owner_id)
     if shop is None:
@@ -64,7 +73,11 @@ async def get_my_shop(owner_id: OwnerIdDep, session: SessionDep) -> ShopMe:
     return ShopMe.from_shop(shop, shop.owner.verification_status)
 
 
-@router.patch("/shops/me", response_model=ShopMe)
+@router.patch(
+    "/shops/me",
+    response_model=ShopMe,
+    summary="내 샵 수정",
+)
 async def update_my_shop(
     request: Request,
     payload: ShopUpdate,
@@ -86,7 +99,11 @@ async def update_my_shop(
     return response
 
 
-@router.put("/shops/me/business-hours", status_code=HTTPStatus.NO_CONTENT)
+@router.put(
+    "/shops/me/business-hours",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="내 샵 영업시간 설정",
+)
 async def set_my_shop_business_hours(
     request: Request,
     payload: BusinessHoursSet,
@@ -106,7 +123,12 @@ async def set_my_shop_business_hours(
     return Response(status_code=HTTPStatus.NO_CONTENT)
 
 
-@router.post("/shops/me/images", response_model=ShopImagePublic, status_code=HTTPStatus.CREATED)
+@router.post(
+    "/shops/me/images",
+    response_model=ShopImagePublic,
+    status_code=HTTPStatus.CREATED,
+    summary="내 샵 이미지 추가",
+)
 async def add_my_shop_image(
     request: Request,
     payload: ShopImageCreate,
@@ -128,7 +150,11 @@ async def add_my_shop_image(
     return response
 
 
-@router.delete("/shops/me/images/{image_id}", status_code=HTTPStatus.NO_CONTENT)
+@router.delete(
+    "/shops/me/images/{image_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="내 샵 이미지 삭제",
+)
 async def delete_my_shop_image(
     request: Request,
     image_id: UUID,
@@ -175,7 +201,11 @@ def _parse_bbox(bbox: str | None) -> tuple[Decimal, Decimal, Decimal, Decimal] |
     return min_lng, min_lat, max_lng, max_lat
 
 
-@router.get("/shops", response_model=list[ShopPublic])
+@router.get(
+    "/shops",
+    response_model=list[ShopPublic],
+    summary="공개 샵 목록 조회",
+)
 async def list_public_shops(
     session: SessionDep,
     bbox: Annotated[str | None, Query()] = None,
@@ -189,7 +219,11 @@ async def list_public_shops(
     return [ShopPublic.from_shop(shop) for shop in shops]
 
 
-@router.get("/shops/{shop_id}", response_model=ShopPublic)
+@router.get(
+    "/shops/{shop_id}",
+    response_model=ShopPublic,
+    summary="공개 샵 상세 조회",
+)
 async def get_public_shop(shop_id: UUID, session: SessionDep) -> ShopPublic:
     shop = await shop_service.get_public_shop(session, shop_id)
     return ShopPublic.from_shop(shop)

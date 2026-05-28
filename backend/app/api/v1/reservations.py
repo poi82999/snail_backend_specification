@@ -44,7 +44,11 @@ def _required_cancel_reason(payload: ReservationActionRequest) -> str:
     return payload.cancel_reason
 
 
-@router.get("/designs/{design_id}/availability", response_model=list[AvailableSlot])
+@router.get(
+    "/designs/{design_id}/availability",
+    response_model=list[AvailableSlot],
+    summary="디자인 예약 가능 시간 조회",
+)
 async def get_design_availability(
     design_id: UUID,
     session: SessionDep,
@@ -59,7 +63,12 @@ async def get_design_availability(
     )
 
 
-@router.post("/reservations", response_model=ReservationMe, status_code=HTTPStatus.CREATED)
+@router.post(
+    "/reservations",
+    response_model=ReservationMe,
+    status_code=HTTPStatus.CREATED,
+    summary="예약 생성",
+)
 async def create_reservation(
     request: Request,
     payload: ReservationCreate,
@@ -90,7 +99,11 @@ async def create_reservation(
     return response
 
 
-@router.get("/me/reservations", response_model=ListResponse[ReservationMe])
+@router.get(
+    "/me/reservations",
+    response_model=ListResponse[ReservationMe],
+    summary="내 예약 목록 조회",
+)
 async def list_my_reservations(
     request: Request,
     user_id: UserIdDep,
@@ -113,7 +126,11 @@ async def list_my_reservations(
     )
 
 
-@router.get("/me/reservations/{reservation_id}", response_model=ReservationMe)
+@router.get(
+    "/me/reservations/{reservation_id}",
+    response_model=ReservationMe,
+    summary="내 예약 상세 조회",
+)
 async def get_my_reservation(
     reservation_id: UUID,
     user_id: UserIdDep,
@@ -127,7 +144,11 @@ async def get_my_reservation(
     return await reservation_service.to_me(session, reservation)
 
 
-@router.post("/me/reservations/{reservation_id}/cancel", response_model=ReservationMe)
+@router.post(
+    "/me/reservations/{reservation_id}/cancel",
+    response_model=ReservationMe,
+    summary="내 예약 취소",
+)
 async def cancel_my_reservation(
     request: Request,
     reservation_id: UUID,
@@ -160,7 +181,11 @@ async def cancel_my_reservation(
     return response
 
 
-@router.get("/me/reservation-stats", response_model=ReservationStatsMe)
+@router.get(
+    "/me/reservation-stats",
+    response_model=ReservationStatsMe,
+    summary="내 예약 통계 조회",
+)
 async def get_my_reservation_stats(
     user_id: UserIdDep,
     session: SessionDep,

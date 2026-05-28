@@ -48,7 +48,11 @@ def _required_cancel_reason(payload: ReservationActionRequest) -> str:
     return payload.cancel_reason
 
 
-@router.get("/shops/me/reservations", response_model=ListResponse[ReservationOwner])
+@router.get(
+    "/shops/me/reservations",
+    response_model=ListResponse[ReservationOwner],
+    summary="샵 예약 목록 조회",
+)
 async def list_shop_reservations(
     request: Request,
     owner_id: OwnerIdDep,
@@ -75,7 +79,11 @@ async def list_shop_reservations(
     )
 
 
-@router.get("/shops/me/reservations/{reservation_id}", response_model=ReservationOwner)
+@router.get(
+    "/shops/me/reservations/{reservation_id}",
+    response_model=ReservationOwner,
+    summary="샵 예약 상세 조회",
+)
 async def get_shop_reservation(
     reservation_id: UUID,
     owner_id: OwnerIdDep,
@@ -89,7 +97,11 @@ async def get_shop_reservation(
     return await reservation_service.to_owner(session, reservation)
 
 
-@router.post("/shops/me/reservations/{reservation_id}/accept", response_model=ReservationOwner)
+@router.post(
+    "/shops/me/reservations/{reservation_id}/accept",
+    response_model=ReservationOwner,
+    summary="샵 예약 승인",
+)
 async def accept_reservation(
     request: Request,
     reservation_id: UUID,
@@ -118,6 +130,7 @@ async def accept_reservation(
 @router.post(
     "/shops/me/reservations/{reservation_id}/confirm-payment",
     response_model=ReservationOwner,
+    summary="예약 결제 확인",
 )
 async def confirm_reservation_payment(
     request: Request,
@@ -148,7 +161,11 @@ async def confirm_reservation_payment(
     return response
 
 
-@router.post("/shops/me/reservations/{reservation_id}/reject", response_model=ReservationOwner)
+@router.post(
+    "/shops/me/reservations/{reservation_id}/reject",
+    response_model=ReservationOwner,
+    summary="샵 예약 거절",
+)
 async def reject_reservation(
     request: Request,
     reservation_id: UUID,
@@ -181,7 +198,11 @@ async def reject_reservation(
     return response
 
 
-@router.post("/shops/me/reservations/{reservation_id}/cancel", response_model=ReservationOwner)
+@router.post(
+    "/shops/me/reservations/{reservation_id}/cancel",
+    response_model=ReservationOwner,
+    summary="샵 예약 취소",
+)
 async def cancel_reservation_by_shop(
     request: Request,
     reservation_id: UUID,
@@ -214,7 +235,11 @@ async def cancel_reservation_by_shop(
     return response
 
 
-@router.post("/shops/me/reservations/{reservation_id}/no-show", response_model=ReservationOwner)
+@router.post(
+    "/shops/me/reservations/{reservation_id}/no-show",
+    response_model=ReservationOwner,
+    summary="노쇼 처리",
+)
 async def mark_no_show(
     request: Request,
     reservation_id: UUID,
@@ -240,7 +265,11 @@ async def mark_no_show(
     return response
 
 
-@router.post("/shops/me/reservations/{reservation_id}/complete", response_model=ReservationOwner)
+@router.post(
+    "/shops/me/reservations/{reservation_id}/complete",
+    response_model=ReservationOwner,
+    summary="예약 완료 처리",
+)
 async def complete_reservation(
     request: Request,
     reservation_id: UUID,

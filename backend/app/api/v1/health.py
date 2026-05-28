@@ -14,7 +14,11 @@ class HealthResponse(BaseModel):
     redis: str
 
 
-@router.get("/health", response_model=HealthResponse)
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    summary="헬스 체크",
+)
 async def health() -> HealthResponse:
     db_status = "down"
     redis_status = "down"

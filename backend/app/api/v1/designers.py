@@ -31,7 +31,12 @@ OwnerIdDep = Annotated[UUID, Depends(current_owner_id)]
 IdempotencyKeyDep = Annotated[str, Depends(required_idempotency_key)]
 
 
-@router.post("/shops/me/designers", response_model=DesignerPublic, status_code=HTTPStatus.CREATED)
+@router.post(
+    "/shops/me/designers",
+    response_model=DesignerPublic,
+    status_code=HTTPStatus.CREATED,
+    summary="디자이너 생성",
+)
 async def create_designer(
     request: Request,
     payload: DesignerCreate,
@@ -53,13 +58,21 @@ async def create_designer(
     return response
 
 
-@router.get("/shops/me/designers", response_model=list[DesignerPublic])
+@router.get(
+    "/shops/me/designers",
+    response_model=list[DesignerPublic],
+    summary="내 샵 디자이너 목록 조회",
+)
 async def list_my_designers(owner_id: OwnerIdDep, session: SessionDep) -> list[DesignerPublic]:
     designers = await designer_service.list_designers_for_my_shop(session, owner_id)
     return [DesignerPublic.model_validate(designer) for designer in designers]
 
 
-@router.patch("/shops/me/designers/{designer_id}", response_model=DesignerPublic)
+@router.patch(
+    "/shops/me/designers/{designer_id}",
+    response_model=DesignerPublic,
+    summary="디자이너 수정",
+)
 async def update_designer(
     request: Request,
     designer_id: UUID,
@@ -82,7 +95,11 @@ async def update_designer(
     return response
 
 
-@router.delete("/shops/me/designers/{designer_id}", status_code=HTTPStatus.NO_CONTENT)
+@router.delete(
+    "/shops/me/designers/{designer_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="디자이너 삭제",
+)
 async def delete_designer(
     request: Request,
     designer_id: UUID,
@@ -102,7 +119,11 @@ async def delete_designer(
     return Response(status_code=HTTPStatus.NO_CONTENT)
 
 
-@router.put("/shops/me/designers/{designer_id}/schedule", status_code=HTTPStatus.NO_CONTENT)
+@router.put(
+    "/shops/me/designers/{designer_id}/schedule",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="디자이너 일정 설정",
+)
 async def set_designer_schedule(
     request: Request,
     designer_id: UUID,
@@ -127,6 +148,7 @@ async def set_designer_schedule(
     "/shops/me/designers/{designer_id}/time-off",
     response_model=TimeOffPublic,
     status_code=HTTPStatus.CREATED,
+    summary="디자이너 휴무 추가",
 )
 async def add_designer_time_off(
     request: Request,
@@ -153,6 +175,7 @@ async def add_designer_time_off(
 @router.delete(
     "/shops/me/designers/{designer_id}/time-off/{time_off_id}",
     status_code=HTTPStatus.NO_CONTENT,
+    summary="디자이너 휴무 삭제",
 )
 async def delete_designer_time_off(
     request: Request,
@@ -174,7 +197,11 @@ async def delete_designer_time_off(
     return Response(status_code=HTTPStatus.NO_CONTENT)
 
 
-@router.get("/shops/{shop_id}/designers", response_model=list[DesignerPublic])
+@router.get(
+    "/shops/{shop_id}/designers",
+    response_model=list[DesignerPublic],
+    summary="공개 디자이너 목록 조회",
+)
 async def list_public_designers(shop_id: UUID, session: SessionDep) -> list[DesignerPublic]:
     designers = await designer_service.list_public_designers_for_shop(session, shop_id)
     return [DesignerPublic.model_validate(designer) for designer in designers]

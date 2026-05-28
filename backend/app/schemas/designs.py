@@ -14,7 +14,10 @@ from app.models.enums import (
 
 
 class DesignOptionCreate(BaseModel):
-    kind: DesignOptionKind
+    kind: DesignOptionKind = Field(
+        description="디자인 옵션 종류. 허용값: extend, removal, care.",
+        examples=["extend"],
+    )
     name: str = Field(min_length=1, max_length=80)
     price_delta: int = Field(default=0, ge=0)
     duration_delta_min: int = Field(default=0, ge=0, le=600)
@@ -22,7 +25,11 @@ class DesignOptionCreate(BaseModel):
 
 
 class DesignOptionUpdate(BaseModel):
-    kind: DesignOptionKind | None = None
+    kind: DesignOptionKind | None = Field(
+        default=None,
+        description="디자인 옵션 종류. 허용값: extend, removal, care.",
+        examples=["care"],
+    )
     name: str | None = Field(default=None, min_length=1, max_length=80)
     price_delta: int | None = Field(default=None, ge=0)
     duration_delta_min: int | None = Field(default=None, ge=0, le=600)
@@ -34,7 +41,10 @@ class DesignOptionPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    kind: DesignOptionKind
+    kind: DesignOptionKind = Field(
+        description="디자인 옵션 종류. 허용값: extend, removal, care.",
+        examples=["removal"],
+    )
     name: str
     price_delta: int
     duration_delta_min: int

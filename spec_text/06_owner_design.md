@@ -165,6 +165,56 @@
         "자동",
         "pending/done/failed"
       ]
+    ],
+    "DesignOption": [
+      [
+        "option_id",
+        "UUID",
+        "자동",
+        "백엔드 생성"
+      ],
+      [
+        "design_id",
+        "UUID",
+        "필수",
+        "소속 디자인"
+      ],
+      [
+        "kind",
+        "enum",
+        "필수",
+        "옵션 종류. API 값은 extend/removal/care"
+      ],
+      [
+        "name",
+        "string",
+        "필수",
+        "옵션 표시명"
+      ],
+      [
+        "price_delta",
+        "int",
+        "필수",
+        "기본 디자인 가격에 더해지는 금액"
+      ],
+      [
+        "duration_delta_min",
+        "int",
+        "필수",
+        "기본 시술 시간에 더해지는 분 단위 소요시간"
+      ],
+      [
+        "sort_order",
+        "int",
+        "자동",
+        "옵션 노출 순서"
+      ],
+      [
+        "is_active",
+        "bool",
+        "자동",
+        "옵션 사용 여부"
+      ]
     ]
   },
   "apis": {
@@ -188,6 +238,26 @@
         "PATCH /owner/designs/{design_id}",
         "디자인 정보 수정",
         "title, description, base_price, duration_minutes, available_designer_ids, owner_tags"
+      ],
+      [
+        "GET /shops/me/designs/{design_id}/options",
+        "디자인 옵션 목록 조회. 예약 시 추가 옵션 선택 UI에 사용",
+        "-"
+      ],
+      [
+        "POST /shops/me/designs/{design_id}/options",
+        "디자인 옵션 생성. kind는 extend/removal/care, price_delta와 duration_delta_min은 예약 금액/시간 계산에 반영",
+        "kind, name, price_delta, duration_delta_min, sort_order"
+      ],
+      [
+        "PATCH /shops/me/designs/{design_id}/options/{option_id}",
+        "디자인 옵션 수정",
+        "kind?, name?, price_delta?, duration_delta_min?, sort_order?, is_active?"
+      ],
+      [
+        "DELETE /shops/me/designs/{design_id}/options/{option_id}",
+        "디자인 옵션 삭제 또는 비활성화",
+        "-"
       ],
       [
         "POST /owner/designs/{design_id}/images",
@@ -218,9 +288,9 @@
   },
   "page_guides": {
     "6.사장님(웹)_디자인": {
-      "covers": "디자인 등록, 가격, 소요시간, 가능 디자이너, 이미지(최대 5장), 사장님 태그(선택), AI 분석 상태, 노출 조건, 이미지 변경 자동 재분석",
+      "covers": "디자인 등록, 가격, 소요시간, 가능 디자이너, 디자인 옵션(연장/제거/케어), 이미지(최대 5장), 사장님 태그(선택), AI 분석 상태, 노출 조건, 이미지 변경 자동 재분석",
       "related_work": "사장님 웹 디자인 등록/수정/숨김/삭제, 이미지 업로드, LLM 재분석, 분석 상태 표시",
-      "how_to_use": "사장님 태그 입력 UI(0~N개 자유 입력, 검색 가중치 안내 가능), 디자인 이미지 1~5장 제한, 분석 중/실패/완료 상태 표시(MVP 사장님 화면은 pending+in_progress를 '분석 중' 한 덩어리로 표시), '아직 사용자에게 노출되지 않음' 안내, 디자인 삭제와 숨김 구분, 분석 실패 시 [재분석] 버튼 노출(POST /owner/designs/{id}/reanalyze)을 확인한다. 사용자 노출은 ai_analysis_status=done + visibility=active + shop.visibility=active + owner.verification_status=approved 조합으로 판정"
+      "how_to_use": "사장님 태그 입력 UI(0~N개 자유 입력, 검색 가중치 안내 가능), 디자인 옵션 CRUD UI(kind/price_delta/duration_delta_min), 디자인 이미지 1~5장 제한, 분석 중/실패/완료 상태 표시(MVP 사장님 화면은 pending+in_progress를 '분석 중' 한 덩어리로 표시), '아직 사용자에게 노출되지 않음' 안내, 디자인 삭제와 숨김 구분, 분석 실패 시 [재분석] 버튼 노출(POST /owner/designs/{id}/reanalyze)을 확인한다. 사용자 노출은 ai_analysis_status=done + visibility=active + shop.visibility=active + owner.verification_status=approved 조합으로 판정"
     }
   }
 }

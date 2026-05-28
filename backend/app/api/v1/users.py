@@ -24,13 +24,21 @@ UserIdDep = Annotated[UUID, Depends(current_user_id)]
 IdempotencyKeyDep = Annotated[str, Depends(required_idempotency_key)]
 
 
-@router.get("/me", response_model=UserMe)
+@router.get(
+    "/me",
+    response_model=UserMe,
+    summary="내 사용자 정보 조회",
+)
 async def get_me(user_id: UserIdDep, session: SessionDep) -> UserMe:
     user = await user_service.get_me(session, user_id)
     return UserMe.model_validate(user)
 
 
-@router.patch("/me", response_model=UserMe)
+@router.patch(
+    "/me",
+    response_model=UserMe,
+    summary="내 사용자 정보 수정",
+)
 async def update_me(
     request: Request,
     payload: UserUpdate,
@@ -52,7 +60,11 @@ async def update_me(
     return response
 
 
-@router.post("/me/device-tokens", status_code=HTTPStatus.NO_CONTENT)
+@router.post(
+    "/me/device-tokens",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="디바이스 토큰 등록",
+)
 async def register_device_token(
     request: Request,
     payload: DeviceTokenRegister,
@@ -72,7 +84,11 @@ async def register_device_token(
     return Response(status_code=HTTPStatus.NO_CONTENT)
 
 
-@router.delete("/me/device-tokens/{token}", status_code=HTTPStatus.NO_CONTENT)
+@router.delete(
+    "/me/device-tokens/{token}",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="디바이스 토큰 삭제",
+)
 async def unregister_device_token(
     request: Request,
     token: str,

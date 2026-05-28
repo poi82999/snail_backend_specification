@@ -36,6 +36,7 @@ IdempotencyKeyDep = Annotated[str, Depends(required_idempotency_key)]
     "/reservations/{reservation_id}/reviews",
     response_model=ReviewPublic,
     status_code=HTTPStatus.CREATED,
+    summary="예약 리뷰 작성",
 )
 async def create_review(
     request: Request,
@@ -58,7 +59,11 @@ async def create_review(
     return response
 
 
-@router.get("/shops/{shop_id}/reviews", response_model=list[ReviewPublic])
+@router.get(
+    "/shops/{shop_id}/reviews",
+    response_model=list[ReviewPublic],
+    summary="샵 리뷰 목록 조회",
+)
 async def list_reviews_for_shop(
     shop_id: UUID,
     params: Annotated[CursorParams, Depends()],
@@ -67,7 +72,11 @@ async def list_reviews_for_shop(
     return await review_service.list_reviews_for_shop(session, shop_id, params)
 
 
-@router.get("/designs/{design_id}/reviews", response_model=list[ReviewPublic])
+@router.get(
+    "/designs/{design_id}/reviews",
+    response_model=list[ReviewPublic],
+    summary="디자인 리뷰 목록 조회",
+)
 async def list_reviews_for_design(
     design_id: UUID,
     params: Annotated[CursorParams, Depends()],
@@ -76,7 +85,11 @@ async def list_reviews_for_design(
     return await review_service.list_reviews_for_design(session, design_id, params)
 
 
-@router.patch("/reviews/{review_id}", response_model=ReviewPublic)
+@router.patch(
+    "/reviews/{review_id}",
+    response_model=ReviewPublic,
+    summary="리뷰 수정",
+)
 async def update_review(
     request: Request,
     review_id: UUID,
@@ -98,7 +111,11 @@ async def update_review(
     return response
 
 
-@router.delete("/reviews/{review_id}", status_code=HTTPStatus.NO_CONTENT)
+@router.delete(
+    "/reviews/{review_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="리뷰 삭제",
+)
 async def delete_review(
     request: Request,
     review_id: UUID,
@@ -122,6 +139,7 @@ async def delete_review(
     "/reviews/{review_id}/replies",
     response_model=ReviewReplyPublic,
     status_code=HTTPStatus.CREATED,
+    summary="리뷰 답글 작성",
 )
 async def create_review_reply(
     request: Request,

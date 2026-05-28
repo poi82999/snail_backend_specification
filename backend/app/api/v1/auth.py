@@ -38,7 +38,11 @@ def _client_host(request: Request) -> str | None:
     return request.client.host if request.client is not None else None
 
 
-@router.post("/apple", response_model=AppleSignInResponse)
+@router.post(
+    "/apple",
+    response_model=AppleSignInResponse,
+    summary="애플 로그인",
+)
 async def apple_sign_in(
     request: Request,
     payload: AppleSignInRequest,
@@ -67,7 +71,12 @@ async def apple_sign_in(
     return response
 
 
-@router.post("/owner/signup", response_model=OwnerMe, status_code=HTTPStatus.CREATED)
+@router.post(
+    "/owner/signup",
+    response_model=OwnerMe,
+    status_code=HTTPStatus.CREATED,
+    summary="사장님 회원가입",
+)
 async def owner_signup(
     request: Request,
     payload: OwnerSignupRequest,
@@ -93,7 +102,11 @@ async def owner_signup(
     return response
 
 
-@router.post("/owner/login", response_model=TokenPair)
+@router.post(
+    "/owner/login",
+    response_model=TokenPair,
+    summary="사장님 로그인",
+)
 async def owner_login(
     payload: OwnerLoginRequest,
     session: SessionDep,
@@ -103,7 +116,11 @@ async def owner_login(
     return response
 
 
-@router.post("/refresh", response_model=TokenPair)
+@router.post(
+    "/refresh",
+    response_model=TokenPair,
+    summary="토큰 갱신",
+)
 async def refresh_tokens(
     payload: RefreshTokenRequest,
     session: SessionDep,
@@ -113,7 +130,11 @@ async def refresh_tokens(
     return response
 
 
-@router.post("/password-reset", status_code=HTTPStatus.NO_CONTENT)
+@router.post(
+    "/password-reset",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="비밀번호 재설정 요청",
+)
 async def request_password_reset(
     request: Request,
     payload: PasswordResetRequest,
@@ -132,7 +153,11 @@ async def request_password_reset(
     return Response(status_code=HTTPStatus.NO_CONTENT)
 
 
-@router.post("/password-reset/confirm", status_code=HTTPStatus.NO_CONTENT)
+@router.post(
+    "/password-reset/confirm",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="비밀번호 재설정 확정",
+)
 async def confirm_password_reset(
     request: Request,
     payload: PasswordResetConfirmRequest,

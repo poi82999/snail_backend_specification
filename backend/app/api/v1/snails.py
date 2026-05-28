@@ -43,7 +43,12 @@ def _comment_actor(actor: dict[str, object]) -> tuple[ActorType, UUID]:
     return actor_type, actor_id
 
 
-@router.post("/snails", response_model=SnapPublic, status_code=HTTPStatus.CREATED)
+@router.post(
+    "/snails",
+    response_model=SnapPublic,
+    status_code=HTTPStatus.CREATED,
+    summary="스네일 게시글 생성",
+)
 async def create_snap(
     request: Request,
     payload: SnapCreate,
@@ -64,7 +69,11 @@ async def create_snap(
     return response
 
 
-@router.get("/snails", response_model=PageResult[SnapPublic])
+@router.get(
+    "/snails",
+    response_model=PageResult[SnapPublic],
+    summary="스네일 피드 조회",
+)
 async def list_snails(
     query: Annotated[SnapFeedQuery, Depends()],
     viewer_user_id: OptionalUserIdDep,
@@ -74,7 +83,11 @@ async def list_snails(
     return PageResult[SnapPublic](items=items, next_cursor=next_cursor)
 
 
-@router.get("/snails/{snap_id}", response_model=SnapPublic)
+@router.get(
+    "/snails/{snap_id}",
+    response_model=SnapPublic,
+    summary="스네일 게시글 상세 조회",
+)
 async def get_snap(
     request: Request,
     snap_id: UUID,
@@ -91,7 +104,11 @@ async def get_snap(
     return await snail_service.get_snap_detail(session, viewer_user_id, snap_id)
 
 
-@router.delete("/snails/{snap_id}", status_code=HTTPStatus.NO_CONTENT)
+@router.delete(
+    "/snails/{snap_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="스네일 게시글 삭제",
+)
 async def delete_snap(
     request: Request,
     snap_id: UUID,
@@ -111,7 +128,11 @@ async def delete_snap(
     return Response(status_code=HTTPStatus.NO_CONTENT)
 
 
-@router.post("/snails/{snap_id}/like", response_model=LikeToggleResponse)
+@router.post(
+    "/snails/{snap_id}/like",
+    response_model=LikeToggleResponse,
+    summary="스네일 좋아요 토글",
+)
 async def toggle_snap_like(
     request: Request,
     snap_id: UUID,
@@ -132,7 +153,11 @@ async def toggle_snap_like(
     return response
 
 
-@router.post("/snails/{snap_id}/save", response_model=SaveToggleResponse)
+@router.post(
+    "/snails/{snap_id}/save",
+    response_model=SaveToggleResponse,
+    summary="스네일 저장 토글",
+)
 async def toggle_snap_save(
     request: Request,
     snap_id: UUID,
@@ -153,7 +178,11 @@ async def toggle_snap_save(
     return response
 
 
-@router.get("/snails/{snap_id}/comments", response_model=list[CommentPublic])
+@router.get(
+    "/snails/{snap_id}/comments",
+    response_model=list[CommentPublic],
+    summary="스네일 댓글 목록 조회",
+)
 async def list_comments(
     snap_id: UUID,
     viewer_user_id: OptionalUserIdDep,
@@ -167,6 +196,7 @@ async def list_comments(
     "/snails/{snap_id}/comments",
     response_model=CommentPublic,
     status_code=HTTPStatus.CREATED,
+    summary="스네일 댓글 생성",
 )
 async def create_comment(
     request: Request,
@@ -196,7 +226,11 @@ async def create_comment(
     return response
 
 
-@router.delete("/comments/{comment_id}", status_code=HTTPStatus.NO_CONTENT)
+@router.delete(
+    "/comments/{comment_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="댓글 삭제",
+)
 async def delete_comment(
     request: Request,
     comment_id: UUID,
@@ -217,7 +251,11 @@ async def delete_comment(
     return Response(status_code=HTTPStatus.NO_CONTENT)
 
 
-@router.post("/comments/{comment_id}/like", response_model=LikeToggleResponse)
+@router.post(
+    "/comments/{comment_id}/like",
+    response_model=LikeToggleResponse,
+    summary="댓글 좋아요 토글",
+)
 async def toggle_comment_like(
     request: Request,
     comment_id: UUID,

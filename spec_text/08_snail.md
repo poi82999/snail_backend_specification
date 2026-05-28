@@ -74,6 +74,18 @@
         "좋아요"
       ],
       [
+        "save_count",
+        "int",
+        "자동",
+        "저장 수. POST /snails/{snap_id}/save 토글 결과로 증가/감소"
+      ],
+      [
+        "saved_by_me",
+        "bool",
+        "자동",
+        "현재 로그인 유저가 저장했는지 여부. SnapPublic 응답에서만 의미 있음"
+      ],
+      [
         "comment_count",
         "int",
         "자동",
@@ -131,6 +143,11 @@
         "GET /snaps/{id}",
         "스네일 상세",
         "-"
+      ],
+      [
+        "POST /snails/{snap_id}/save",
+        "스네일 저장 토글",
+        "Idempotency-Key header"
       ],
       [
         "GET /snaps/me",

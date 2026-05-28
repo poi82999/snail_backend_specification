@@ -85,7 +85,7 @@ QA 체크리스트:
 - POST /owner/auth/password-reset/confirm : 비밀번호 재설정 2단계 — 토큰 + 신규 비밀번호 제출. 토큰 유효성/만료/사용여부 검증 후 비번 갱신, 토큰 1회용 소진
 
 ## 2. 샵 설정
-요약: 샵 기본 정보, 영업시간, 예약 운영 정책, 현장결제/계좌이체 설정.
+요약: 샵 기본 정보, location_tags, 영업시간, 예약 운영 정책, 현장결제/계좌이체 설정, 뷰포트 조회.
 구현 가이드:
 - 샵 리소스 단수 취급: 우리 서비스는 사장님 1명당 샵 1개(MVP 기준)만 가집니다. 따라서 프론트 라우팅이나 전역 상태에서 `shop_id`를 복잡하게 들고 다닐 필요 없이 무조건 `/owner/shop` 단수 API를 호출하시면 됩니다.
 - 초안 저장과 공개 전환: 사업자 승인이 나기 전(pending)이라도 샵 정보를 미리 작성하고 임시 저장(draft)할 수는 있어야 합니다. 단, 고객에게 샵을 노출하는 `visibility=active` 버튼이나 예약 운영 시작 버튼은 반드시 승인(approved) 후에만 켤 수 있게 비활성화(disabled) 해주세요.
@@ -93,6 +93,7 @@ QA 체크리스트:
 체크포인트:
 - MVP는 1사장님=1샵 단수 구조이며 사장님 웹 API는 /owner/shop 기준으로 사용.
 - auto_accept=true이면 bank_transfer_guide 조합은 백엔드도 VALIDATION_ERROR로 거부.
+- 유저 앱 지도/목록은 GET /shops의 bbox + location_tag 조합으로 현재 뷰포트 샵을 조회.
 API 호출 순서:
 - [초기 진입]: 샵 설정 화면에 들어오면 `POST /owner/shop`을 호출하여 샵 정보를 가져옵니다.
 - [초안 폼 렌더링]: 아직 샵 데이터가 404로 없으면 빈 입력 폼을 띄워주고, 폼 작성 후 저장할 때 `POST /owner/shop`으로 생성합니다.
@@ -114,7 +115,7 @@ QA 체크리스트:
 - [ ] 사업자 승인 전(pending) 계정으로 로그인한 상태에서 샵 정보를 이것저것 적고 저장을 누르면 성공해야 하고, 샵 공개 토글을 누르면 명확히 막히는지 직접 테스트해주세요.
 - [ ] [예약 정책] 탭에서 `자동 수락` 토글을 켠 상태일 때, [결제 방식] 탭으로 이동하면 `계좌이체 안내` 선택 박스가 회색으로 잠겨서 아예 클릭을 못 하게 막혀있는지 확인해주세요.
 - [ ] 계좌이체 옵션을 선택했을 때, 나타나는 4가지 하위 입력칸(예약금액, 은행명, 계좌번호, 예금주)을 다 채우기 전까지는 [저장] 버튼이 활성화되지 않는지 프론트 validation을 확인해주세요.
-관련 필드: Shop.name, Shop.address, Shop.address_detail, Shop.region, Shop.lat, Shop.lng, Shop.phone, Shop.description, Shop.thumbnail_url, Shop.image_urls, Shop.visibility, Shop.business_hours, Shop.auto_accept, Shop.reservation_policy, Shop.payment_method, Shop.deposit_amount, Shop.bank_name, Shop.bank_account_number, Shop.bank_account_holder, Shop.rating_avg, Shop.rating_count, Shop.favorite_count
+관련 필드: Shop.name, Shop.address, Shop.address_detail, Shop.region, Shop.location_tags, Shop.lat, Shop.lng, Shop.phone, Shop.description, Shop.thumbnail_url, Shop.image_urls, Shop.visibility, Shop.business_hours, Shop.auto_accept, Shop.reservation_policy, Shop.payment_method, Shop.deposit_amount, Shop.bank_name, Shop.bank_account_number, Shop.bank_account_holder, Shop.rating_avg, Shop.rating_count, Shop.favorite_count
 관련 API:
 - POST /owner/shop : 내 단수 샵 초안 생성. 사업자 승인 전에도 draft 작성 가능. payment_method=bank_transfer_guide면 deposit_amount, bank_name, bank_account_numbe...
 - GET /owner/shop : 내 단수 샵 상세/초안 조회
@@ -124,6 +125,7 @@ QA 체크리스트:
 - PATCH /owner/shop/payment-method : 결제 방식 변경 (현장결제 ↔ 계좌이체 예약금 안내) 및 예약금/계좌 정보 수정. bank_transfer_guide로 전환 시 deposit_amount + 계좌 3필드 모두 필수, 또한 현재 shop의 auto...
 - PATCH /owner/shop/images : 대표 이미지/샵 이미지 수정
 - PATCH /owner/shop/visibility : 샵 공개/숨김 전환. active 전환은 verification_status=approved일 때만 허용. 공개 상태에서만 유저 검색/상세/예약 진입 가능
+- GET /shops : 공개 샵 목록/지도 뷰포트 조회. bbox와 location_tag로 현재 지도 영역 또는 지역 태그에 맞는 샵을 반환
 
 ## 3. 디자이너 관리
 요약: 디자이너 추가/수정, 전문 태그, 주간 근무시간, 임시 불가 시간, 비활성화.
@@ -164,23 +166,27 @@ QA 체크리스트:
 - DELETE /owner/designers/{designer_id} : 퇴사/비활성화 처리
 
 ## 4. 디자인 등록 및 관리
-요약: 디자인 등록, 이미지 업로드, owner_tags, LLM 분석 상태, 재분석, 노출/숨김/삭제.
+요약: 디자인 등록, 디자인 옵션 CRUD, 이미지 업로드, owner_tags, LLM 분석 상태, 재분석, 노출/숨김/삭제.
 구현 가이드:
 - 이미지 갯수 검증: 디자인 이미지는 최소 1장에서 최대 5장까지만 등록 가능합니다. 프론트의 업로드 UI 컴포넌트에서도 5장이 차면 업로드 버튼을 숨기거나 비활성화해서 백엔드와 정책을 100% 맞춰주세요.
 - 오너 태그(owner_tags) 주의: 사장님이 직접 다는 태그는 반드시 `owner_tags`라는 키로 배열을 묶어서 보내야 합니다. 과거에 썼던 `tags`라는 이름으로 보내면 백엔드에서 무시되니 주의하세요.
+- 디자인 옵션: 연장/제거/케어 옵션은 `DesignOption.kind`, `price_delta`, `duration_delta_min`으로 관리합니다. 예약 화면의 옵션 선택은 최종 가격과 종료 시각에 반영됩니다.
 - 사용자 노출 조건 안내: 사장님이 디자인을 등록했다고 바로 유저 앱에 노출되지 않습니다. [사장님 계정 승인 + 샵 공개 상태 + 디자인 공개 상태 + AI 분석 완료] 4박자가 모두 맞아야 합니다. 따라서 '공개'로 설정되어 있어도 아직 노출 안 되는 상황이라면, 툴팁이나 배지로 'AI 분석 중이라 아직 노출되지 않습니다' 등을 친절하게 안내해주세요.
 체크포인트:
 - 디자인 이미지는 프론트와 백엔드 API 모두 최대 5장 제한으로 맞춤.
 - 사장님 화면은 pending+in_progress를 '분석 중' 한 상태로 묶어 표시.
+- 디자인 옵션 kind/price_delta/duration_delta_min은 예약 total_price와 종료 시각 계산에 직접 반영됨.
 API 호출 순서:
 - [목록 진입]: 디자인(손톱 포트폴리오) 목록 화면 진입 시 `POST /owner/designs`를 호출합니다. 필터링을 위해 visibility와 ai_analysis_status 쿼리를 활용할 수 있습니다.
 - [신규 등록]: 디자인 폼에 이미지(1~5장)와 가격, 설명 등을 채우고 [저장]을 누르면 프론트에서 유효성 검사 후 `POST /owner/designs`를 쏩니다.
 - [상세 및 폴링]: 디자인 카드를 누르면 `POST /owner/designs`를 호출하여 가장 최신의 AI 분석 상태(status)와 결과값을 화면에 뿌려줍니다.
 - [수정 처리]: 제목이나 가격, 태그 등을 수정하고 저장할 때는 `POST /owner/designs`를 호출합니다.
+- [디자인 옵션]: 옵션 목록은 `GET /shops/me/designs/{design_id}/options`로 읽고, 추가/수정/삭제 버튼은 각각 POST/PATCH/DELETE 옵션 API와 연결합니다.
 - [사진 교체 시 주의]: 사진을 추가(`POST .../images`)하거나 지울(`DELETE .../images/{id}`) 경우, 백엔드에서 AI 분석 상태를 다시 pending으로 돌려버리므로 화면에서도 뱃지를 즉시 '분석 중 ⏳'으로 덮어씌워야 합니다.
 - [수동 재분석]: AI가 너무 이상하게 분석했거나 failed 떴을 때 누르는 재분석 버튼은 `POST /owner/designs/{design_id}/reanalyze`를 호출합니다.
 버튼/이벤트 처리:
 - [버튼] 새 디자인 등록 -> POST /owner/designs -> 성공: 등록 성공 토스트와 함께 목록 맨 위로 올려주고, 상태 뱃지는 무조건 'AI 분석 중'으로 달아줍니다. / 실패: 가장 흔한 에러인 필수값 누락이나 이미지 0장 업로드 시도는 API를 쏘기 전에 프론트에서 막고 폼 에러를 띄워주세요.
+- [버튼] 디자인 옵션 저장 -> POST/PATCH /shops/me/designs/{design_id}/options -> 성공: 옵션 목록을 다시 불러오고 예약 미리보기 가격/소요시간을 즉시 갱신합니다. / 실패: kind가 extend/removal/care 밖이거나 금액/시간 delta가 음수이면 폼 에러로 표시합니다.
 - [버튼] 사진 추가/수정 -> POST /owner/designs/{design_id}/images -> 성공: 새 이미지가 렌더링되면서 동시에 디자인 전체의 뱃지를 '분석 중'으로 강제 전환시켜야 합니다. / 실패: 6장째 이미지를 올리려고 하면 파일 브라우저 창을 띄우지 말고 '최대 5장까지만 가능해요' 툴팁을 보여줍니다.
 - [버튼] AI 결과 수동 재분석 -> POST /owner/designs/{design_id}/reanalyze -> 성공: 버튼 클릭 즉시 화면 전체 또는 해당 카드를 로딩 스피너/분석 중 배지로 바꿔서 '작업이 들어갔다'는 피드백을 확실히 줍니다. / 실패: 수동 재분석이 허용되지 않는 상태(이미 분석 중 등)일 때 프론트에서 버튼을 흐리게(Disabled) 처리했는지 확인하세요.
 - [토글] 고객 노출 상태 변경 -> PATCH /owner/designs/{design_id}/visibility -> 성공: 성공하면 스위치가 초록색(ON)으로 바뀌고 리스트 뱃지도 active 갱신됩니다. / 실패: 아직 AI 분석이 덜 끝났거나(pending), 사장님 사업자 승인이 안 났다면 토글이 켜지지 않게 프론트에서 막아주세요.
@@ -193,12 +199,16 @@ QA 체크리스트:
 - [ ] 디자인 등록 폼에서 사진을 아예 안 올리거나, 6장을 꽉 채워 올리려 할 때 백엔드 에러 전에 프론트엔드가 자체적으로 에러 메시지와 함께 막는지 테스트해주세요.
 - [ ] 새로 디자인을 등록하자마자 리스트로 돌아왔을 때, '공개' 토글이 아직 켜지지 않도록 잘 막아뒀는지 눈으로 확인해주세요 (분석이 안 끝났으므로).
 - [ ] 일부러 이상한 사진을 올려 AI 분석이 `failed` 상태가 되었을 때, 화면에 빨간 경고창과 함께 [재분석하기] 버튼이 나타나는지 확인해주세요.
-관련 필드: Design.title, Design.description, Design.base_price, Design.duration_minutes, Design.available_designer_ids, Design.owner_tags, Design.ai_tags, Design.ai_color_palette, Design.ai_style_category, Design.visibility, Design.ai_analysis_status, Design.ai_analysis_started_at, Design.ai_analysis_completed_at, Design.favorite_count, Design.view_count, DesignImage.image_id, DesignImage.original_url, DesignImage.cropped_url, DesignImage.sort_order, DesignImage.ai_transform_status, DesignImage.ai_classify_status
+관련 필드: Design.title, Design.description, Design.base_price, Design.duration_minutes, Design.available_designer_ids, Design.owner_tags, Design.ai_tags, Design.ai_color_palette, Design.ai_style_category, Design.visibility, Design.ai_analysis_status, Design.ai_analysis_started_at, Design.ai_analysis_completed_at, Design.favorite_count, Design.view_count, DesignImage.image_id, DesignImage.original_url, DesignImage.cropped_url, DesignImage.sort_order, DesignImage.ai_transform_status, DesignImage.ai_classify_status, DesignOption.kind, DesignOption.name, DesignOption.price_delta, DesignOption.duration_delta_min, DesignOption.sort_order, DesignOption.is_active
 관련 API:
 - POST /owner/designs : 내 단수 샵 디자인 등록 (사장님 응답 즉시 200, AI 분석은 백그라운드 큐). 이미지 최대 5장. owner_tags는 선택(0~N개). 등록 직후 visibility=active, ai_analysis_st...
 - GET /owner/designs : 내 단수 샵 디자인 목록. 필터로 visibility, ai_analysis_status 둘 다 사용 가능. 사장님 화면에서 '분석 중', '분석 실패', '숨김' 탭 구분
 - GET /owner/designs/{design_id} : 디자인 상세/LLM 분석 상태 조회
 - PATCH /owner/designs/{design_id} : 디자인 정보 수정
+- GET /shops/me/designs/{design_id}/options : 디자인 옵션 목록 조회. 예약 시 추가 옵션 선택 UI에 사용
+- POST /shops/me/designs/{design_id}/options : 디자인 옵션 생성. kind는 extend/removal/care, price_delta와 duration_delta_min은 예약 금액/시간 계산에 반영
+- PATCH /shops/me/designs/{design_id}/options/{option_id} : 디자인 옵션 수정
+- DELETE /shops/me/designs/{design_id}/options/{option_id} : 디자인 옵션 삭제 또는 비활성화
 - POST /owner/designs/{design_id}/images : 디자인 이미지 추가. 디자인당 이미지 최대 5장 제한을 초과하면 VALIDATION_ERROR. 호출 시 백엔드가 design.ai_analysis_status를 pending으로 자동 되돌리고 LLM 큐에 재투입...
 - DELETE /owner/designs/{design_id}/images/{image_id} : 디자인 이미지 삭제. 삭제 후 최소 1장 이상 남아야 함. 호출 시 design.ai_analysis_status를 pending으로 자동 되돌리고 LLM 큐에 재투입 (이미지 변경 자동 재분석 트리거)
 - POST /owner/designs/{design_id}/reanalyze : LLM 재분석 요청. ai_analysis_status=failed이거나 사장님이 수동으로 다시 돌리고 싶을 때. pending으로 되돌리고 큐에 재투입
@@ -214,6 +224,7 @@ QA 체크리스트:
 체크포인트:
 - CSV export는 API 후보가 있지만 MVP 1차 출시 제외로 표시되어야 함.
 - 입금 확인 요청 뱃지는 status/payment snapshot/입금 알림/사장님 확인 시각 4조건을 모두 봄.
+- 예약 상세에는 유저가 선택한 디자인 옵션(selected_option_ids)과 옵션별 추가 금액/시간을 같이 확인할 수 있어야 함.
 API 호출 순서:
 - [예약 목록 진입]: 예약 캘린더나 리스트에 들어올 때 `GET /owner/reservations?from=날짜&to=날짜&status=상태` 쿼리를 잘 조합해서 호출해 화면을 그립니다.
 - [최신화 조회]: 특정 예약 카드를 눌러 팝업/모달 상세를 띄울 때는 방금 전 상태가 바뀌었을지 모르니 `GET /owner/reservations` 단건 조회를 한 번 더 날려 최신화합니다.
@@ -238,7 +249,7 @@ QA 체크리스트:
 - [ ] 계좌이체 샵 예약에서 유저가 앱에서 [입금 완료]를 눌렀더라도, 사장님 화면에 아직 [입금 내역 확인 완료] 버튼이 떡하니 살아있고 확정 상태가 아닌지 교차 검증해주세요.
 - [ ] 동일한 시간에 겹치는 2개의 pending 예약 중 하나를 수락했을 때, 나머지 하나를 수락하려 하면 에러 팝업(CONFLICT)이 제대로 뜨며 막히는지 테스트하세요.
 - [ ] 확정된(confirmed) 예약 상세 화면에서, 시술 시간이 아직 30분도 안 지났는데 실수로 [노쇼 처리] 버튼을 누르지 못하도록 프론트에서 버튼을 비활성화해두었는지 확인해주세요.
-관련 필드: Reservation.reservation_id, Reservation.user_id, Reservation.shop_id, Reservation.design_id, Reservation.designer_id, Reservation.start_datetime, Reservation.end_datetime, Reservation.duration_minutes, Reservation.status, Reservation.total_price, Reservation.reservation_policy_snapshot, Reservation.payment_method_snapshot, Reservation.deposit_amount_snapshot, Reservation.bank_transfer_guide_snapshot, Reservation.user_payment_notified_at, Reservation.owner_payment_confirmed_at, Reservation.reminder_sent_at, Reservation.user_request_memo, Reservation.assigned_by, Reservation.idempotency_key, Reservation.cancel_reason, Reservation.cancelled_at, Reservation.completed_at, Reservation.no_show_at
+관련 필드: Reservation.reservation_id, Reservation.user_id, Reservation.shop_id, Reservation.design_id, Reservation.designer_id, Reservation.start_datetime, Reservation.end_datetime, Reservation.duration_minutes, Reservation.status, Reservation.total_price, Reservation.selected_option_ids, Reservation.reservation_policy_snapshot, Reservation.payment_method_snapshot, Reservation.deposit_amount_snapshot, Reservation.bank_transfer_guide_snapshot, Reservation.user_payment_notified_at, Reservation.owner_payment_confirmed_at, Reservation.reminder_sent_at, Reservation.user_request_memo, Reservation.assigned_by, Reservation.idempotency_key, Reservation.cancel_reason, Reservation.cancelled_at, Reservation.completed_at, Reservation.no_show_at
 관련 API:
 - GET /owner/reservations : 예약 캘린더 + 미처리 pending 목록. pending 목록은 created_at 오름차순(먼저 예약 요청한 순서)으로 제공해 사장님이 순서대로 응답할 수 있게 함
 - GET /owner/reservations/export : 예약 내역 다운로드 (post-MVP 우선순위 큐). CSV 포맷으로 내보내기
@@ -252,7 +263,7 @@ QA 체크리스트:
 - GET /owner/designers/{id}/schedule : 디자이너 스케줄 뷰
 
 ## 6. 리뷰 관리
-요약: 본인 샵 리뷰 목록, 평균 별점/리뷰 수, 정렬, 리뷰 답변 작성/수정/삭제.
+요약: 본인 샵 리뷰 목록, 평균 별점/리뷰 수, 정렬, 리뷰 수정/삭제, 리뷰 답변 작성/수정/삭제.
 구현 가이드:
 - 내 샵 리뷰 조회: 리뷰 목록을 가져올 때 `/shops/{id}/reviews` (일반 고객용 API)를 쓸 필요가 없습니다. 사장님 토큰을 달고 전용 API인 `/owner/reviews`를 호출하면 알아서 내 샵의 리뷰들만 가져옵니다.
 - 미답변 리뷰 필터 연동: 대시보드의 '미답변 리뷰(unanswered_review_count)' 카드를 클릭해서 리뷰 화면으로 넘어왔다면, 자동으로 `unanswered=true` 쿼리 필터가 적용된 상태로 렌더링되게 해주세요.
@@ -260,6 +271,7 @@ QA 체크리스트:
 체크포인트:
 - 사장님 전용 리뷰 목록은 `PATCH /reviews/{id}`를 사용합니다. 사장님 토큰만 있으면 자동으로 내 샵 리뷰만 조회됩니다. `PATCH /reviews/{id}`는 일반 고객용이므로 사장님 웹에서는 쓸 필요 없습니다.
 - 대시보드의 unanswered_review_count는 shop_reply IS NULL 기준.
+- 유저 작성 리뷰 수정/삭제는 작성 7일 이내만 허용되며, 기간 초과 시 REVIEW_EDIT_WINDOW_CLOSED로 안내.
 API 호출 순서:
 - [리뷰 목록 진입]: 리뷰 화면에 처음 들어오면 `PATCH /reviews/{id}`에 sort, unanswered, cursor 등의 필터 쿼리 파라미터를 말아서 호출합니다.
 - [미답변 필터 연동]: 대시보드에서 '미답변 리뷰 3건' 카드를 콕 찍어서 넘어온 경우엔 프론트 라우터가 똑똑하게 `unanswered=true` 쿼리를 물고 들어오게 렌더링해야 합니다.
@@ -282,6 +294,8 @@ QA 체크리스트:
 관련 API:
 - GET /owner/reviews : 내 단수 샵 리뷰 목록. 사장님 웹 전용. sort 허용값: latest(기본) / rating_desc / rating_asc, unanswered=true이면 shop_reply IS NULL만 조회
 - GET /shops/{id}/reviews : 샵 리뷰 목록. sort 허용값: latest(기본) / rating_desc / rating_asc
+- PATCH /reviews/{id} : 리뷰 수정. 작성 후 7일 이내만 허용하며 기간 초과 시 REVIEW_EDIT_WINDOW_CLOSED
+- DELETE /reviews/{id} : 리뷰 삭제. 작성 후 7일 이내만 허용하며 기간 초과 시 REVIEW_EDIT_WINDOW_CLOSED
 - POST /reviews/{id}/reply : 샵 답변 작성 (리뷰당 1개). 사장님만
 - PATCH /reviews/{id}/reply : 샵 답변 수정. 사장님만
 - DELETE /reviews/{id}/reply : 샵 답변 삭제. shop_reply와 shop_reply_at을 null로 클리어. 사장님만
@@ -314,11 +328,12 @@ QA 체크리스트:
 - [ ] 사장님 스네일 탭에 진입했을 때, 정말로 우리 샵이 태그된 게시물들만 정확하게 필터링되어 리스트에 올라오는지 테스트 데이터로 확인해주세요.
 - [ ] 사장님 계정으로 남긴 댓글을 렌더링할 때, 일반 유저들이 쓴 댓글들과 UI적으로 명확히 구분되는 '샵 공식 마크'가 잘 그려지는지 확인해주세요.
 - [ ] 남이 쓴 일반 댓글 영역을 호버(Hover)하거나 클릭했을 때, 실수로라도 수정/삭제 액션 버튼 뭉치가 보이지 않게 프론트 코드로 단단히 숨겼는지 체크해주세요.
-관련 필드: Snap.snap_id, Snap.author_user_id, Snap.caption, Snap.image_urls, Snap.tagged_shop_id, Snap.tagged_design_id, Snap.tagged_designer_id, Snap.like_count, Snap.comment_count, Snap.created_at, Comment.comment_id, Comment.snap_id, Comment.author_type, Comment.author_user_id, Comment.author_shop_id, Comment.content, Comment.created_at
+관련 필드: Snap.snap_id, Snap.author_user_id, Snap.caption, Snap.image_urls, Snap.tagged_shop_id, Snap.tagged_design_id, Snap.tagged_designer_id, Snap.like_count, Snap.save_count, Snap.saved_by_me, Snap.comment_count, Snap.created_at, Comment.comment_id, Comment.snap_id, Comment.author_type, Comment.author_user_id, Comment.author_shop_id, Comment.content, Comment.created_at
 관련 API:
 - GET /owner/snaps : 내 단수 샵이 태그된 스네일 목록. 사장님 웹 전용
 - GET /shops/{id}/snaps : 특정 샵 태그 스네일
 - GET /snaps/{id} : 스네일 상세
+- POST /snails/{snap_id}/save : 스네일 저장 토글
 - GET /snaps/{id}/comments : 스네일 댓글 목록
 - POST /snaps/{id}/comments : 댓글 작성. 사장님 웹에서 호출하면 본인 단수 샵 계정(author_type=shop, author_shop_id=내 shop_id)으로 작성
 - PATCH /comments/{id} : 댓글 수정

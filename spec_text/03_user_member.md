@@ -56,6 +56,12 @@
         "표준 태그 사전 내"
       ],
       [
+        "image_view_mode",
+        "enum",
+        "필수",
+        "앱 이미지 보기 기본값. API 값은 model/wear"
+      ],
+      [
         "device_token",
         "string",
         "필수",
@@ -107,7 +113,7 @@
       [
         "PATCH /users/me",
         "내 프로필 수정",
-        "nickname, profile_image_url, bio, preferred_tags"
+        "nickname, profile_image_url, bio, preferred_tags, image_view_mode"
       ],
       [
         "DELETE /users/me",

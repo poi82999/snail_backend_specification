@@ -28,7 +28,11 @@ UserIdDep = Annotated[UUID, Depends(current_user_id)]
 IdempotencyKeyDep = Annotated[str, Depends(required_idempotency_key)]
 
 
-@router.post("/users/{user_id}/follow", response_model=FollowToggleResponse)
+@router.post(
+    "/users/{user_id}/follow",
+    response_model=FollowToggleResponse,
+    summary="사용자 팔로우 토글",
+)
 async def toggle_follow(
     request: Request,
     user_id: UUID,
@@ -49,7 +53,11 @@ async def toggle_follow(
     return response
 
 
-@router.get("/users/{user_id}/followers", response_model=ListResponse[UserPublic])
+@router.get(
+    "/users/{user_id}/followers",
+    response_model=ListResponse[UserPublic],
+    summary="팔로워 목록 조회",
+)
 async def list_followers(
     request: Request,
     user_id: UUID,
@@ -64,7 +72,11 @@ async def list_followers(
     )
 
 
-@router.get("/users/{user_id}/following", response_model=ListResponse[UserPublic])
+@router.get(
+    "/users/{user_id}/following",
+    response_model=ListResponse[UserPublic],
+    summary="팔로잉 목록 조회",
+)
 async def list_following(
     request: Request,
     user_id: UUID,

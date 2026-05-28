@@ -64,7 +64,12 @@ def design_search_query(
     )
 
 
-@router.post("/shops/me/designs", response_model=DesignMe, status_code=HTTPStatus.CREATED)
+@router.post(
+    "/shops/me/designs",
+    response_model=DesignMe,
+    status_code=HTTPStatus.CREATED,
+    summary="디자인 생성",
+)
 async def create_design(
     request: Request,
     payload: DesignCreate,
@@ -85,7 +90,11 @@ async def create_design(
     return response
 
 
-@router.get("/shops/me/designs", response_model=list[DesignMe])
+@router.get(
+    "/shops/me/designs",
+    response_model=list[DesignMe],
+    summary="내 샵 디자인 목록 조회",
+)
 async def list_my_designs(
     owner_id: OwnerIdDep,
     session: SessionDep,
@@ -94,7 +103,11 @@ async def list_my_designs(
     return await design_service.list_my_designs(session, owner_id, params)
 
 
-@router.get("/shops/me/designs/{design_id}", response_model=DesignMe)
+@router.get(
+    "/shops/me/designs/{design_id}",
+    response_model=DesignMe,
+    summary="내 샵 디자인 상세 조회",
+)
 async def get_my_design(
     design_id: UUID,
     owner_id: OwnerIdDep,
@@ -103,7 +116,11 @@ async def get_my_design(
     return await design_service.get_my_design(session, owner_id, design_id)
 
 
-@router.patch("/shops/me/designs/{design_id}", response_model=DesignMe)
+@router.patch(
+    "/shops/me/designs/{design_id}",
+    response_model=DesignMe,
+    summary="디자인 수정",
+)
 async def update_design(
     request: Request,
     design_id: UUID,
@@ -125,7 +142,11 @@ async def update_design(
     return response
 
 
-@router.delete("/shops/me/designs/{design_id}", status_code=HTTPStatus.NO_CONTENT)
+@router.delete(
+    "/shops/me/designs/{design_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+    summary="디자인 삭제",
+)
 async def delete_design(
     request: Request,
     design_id: UUID,
@@ -149,6 +170,7 @@ async def delete_design(
     "/shops/me/designs/{design_id}/reanalyze",
     response_model=DesignReanalyzeQueued,
     status_code=HTTPStatus.ACCEPTED,
+    summary="디자인 재분석 요청",
 )
 async def request_reanalyze(
     request: Request,
@@ -171,7 +193,11 @@ async def request_reanalyze(
     return response
 
 
-@router.post("/shops/me/designs/{design_id}/visibility", response_model=DesignMe)
+@router.post(
+    "/shops/me/designs/{design_id}/visibility",
+    response_model=DesignMe,
+    summary="디자인 공개 상태 변경",
+)
 async def change_visibility(
     request: Request,
     design_id: UUID,
@@ -198,7 +224,11 @@ async def change_visibility(
     return response
 
 
-@router.get("/shops/me/designs/{design_id}/options", response_model=list[DesignOptionPublic])
+@router.get(
+    "/shops/me/designs/{design_id}/options",
+    response_model=list[DesignOptionPublic],
+    summary="디자인 옵션 목록 조회",
+)
 async def list_design_options(
     design_id: UUID,
     owner_id: OwnerIdDep,
@@ -211,6 +241,7 @@ async def list_design_options(
     "/shops/me/designs/{design_id}/options",
     response_model=DesignOptionPublic,
     status_code=HTTPStatus.CREATED,
+    summary="디자인 옵션 생성",
 )
 async def create_design_option(
     request: Request,
@@ -236,6 +267,7 @@ async def create_design_option(
 @router.patch(
     "/shops/me/designs/{design_id}/options/{option_id}",
     response_model=DesignOptionPublic,
+    summary="디자인 옵션 수정",
 )
 async def update_design_option(
     request: Request,
@@ -264,6 +296,7 @@ async def update_design_option(
 @router.delete(
     "/shops/me/designs/{design_id}/options/{option_id}",
     status_code=HTTPStatus.NO_CONTENT,
+    summary="디자인 옵션 삭제",
 )
 async def delete_design_option(
     request: Request,
@@ -285,7 +318,11 @@ async def delete_design_option(
     return Response(status_code=HTTPStatus.NO_CONTENT)
 
 
-@router.get("/designs/{design_id}", response_model=DesignPublic)
+@router.get(
+    "/designs/{design_id}",
+    response_model=DesignPublic,
+    summary="공개 디자인 상세 조회",
+)
 async def get_public_design(
     design_id: UUID,
     viewer_user_id: Annotated[UUID | None, Depends(optional_user_id)],
@@ -294,7 +331,11 @@ async def get_public_design(
     return await design_service.get_public_design(session, viewer_user_id, design_id)
 
 
-@router.get("/designs", response_model=SearchResult)
+@router.get(
+    "/designs",
+    response_model=SearchResult,
+    summary="공개 디자인 검색",
+)
 async def search_designs(
     query: Annotated[SearchQuery, Depends(design_search_query)],
     viewer_user_id: Annotated[UUID | None, Depends(optional_user_id)],

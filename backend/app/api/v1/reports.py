@@ -24,7 +24,12 @@ UserIdDep = Annotated[UUID, Depends(current_user_id)]
 IdempotencyKeyDep = Annotated[str, Depends(required_idempotency_key)]
 
 
-@router.post("/reports", response_model=ReportPublic, status_code=HTTPStatus.CREATED)
+@router.post(
+    "/reports",
+    response_model=ReportPublic,
+    status_code=HTTPStatus.CREATED,
+    summary="신고 생성",
+)
 async def create_report(
     request: Request,
     payload: ReportCreate,

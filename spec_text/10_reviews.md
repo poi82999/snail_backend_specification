@@ -113,12 +113,12 @@
       ],
       [
         "PATCH /reviews/{id}",
-        "리뷰 수정",
+        "리뷰 수정. 작성 후 7일 이내만 허용하며 기간 초과 시 REVIEW_EDIT_WINDOW_CLOSED",
         "rating, content, image_urls"
       ],
       [
         "DELETE /reviews/{id}",
-        "리뷰 삭제",
+        "리뷰 삭제. 작성 후 7일 이내만 허용하며 기간 초과 시 REVIEW_EDIT_WINDOW_CLOSED",
         "-"
       ],
       [

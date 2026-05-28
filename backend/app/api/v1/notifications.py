@@ -71,6 +71,7 @@ async def _list_owner_notifications_response(
 @router.get(
     "/shops/me/notifications",
     response_model=OwnerNotificationListResponse,
+    summary="샵 알림 목록 조회",
 )
 async def list_shop_notifications(
     request: Request,
@@ -91,6 +92,7 @@ async def list_shop_notifications(
 @router.get(
     "/owners/me/notifications",
     response_model=OwnerNotificationListResponse,
+    summary="사장님 알림 목록 조회",
 )
 async def list_owner_notifications(
     request: Request,
@@ -143,6 +145,7 @@ async def _mark_notification_read_response(
 @router.patch(
     "/shops/me/notifications/{notification_id}/read",
     response_model=DataResponse[OwnerNotificationPublic],
+    summary="샵 알림 읽음 처리",
 )
 async def mark_shop_notification_read(
     request: Request,
@@ -163,6 +166,7 @@ async def mark_shop_notification_read(
 @router.post(
     "/owners/me/notifications/{notification_id}/read",
     response_model=DataResponse[OwnerNotificationPublic],
+    summary="사장님 알림 읽음 처리",
 )
 async def mark_owner_notification_read(
     request: Request,
@@ -183,6 +187,7 @@ async def mark_owner_notification_read(
 @router.post(
     "/owners/me/notifications/read-all",
     response_model=DataResponse[dict[str, int]],
+    summary="사장님 알림 전체 읽음 처리",
 )
 async def mark_all_owner_notifications_read(
     request: Request,

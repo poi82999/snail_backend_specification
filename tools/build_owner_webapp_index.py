@@ -58,7 +58,7 @@ OWNER_SECTION_MAP = [
         "id": "2",
         "title": "샵 설정",
         "front_sections": ["2", "2-1", "2-2", "2-3", "2-4"],
-        "summary": "샵 기본 정보, 영업시간, 예약 운영 정책, 현장결제/계좌이체 설정.",
+        "summary": "샵 기본 정보, location_tags, 영업시간, 예약 운영 정책, 현장결제/계좌이체 설정, 뷰포트 조회.",
         "backend_files": ["spec_text/05_owner_shop.md", "spec_text/16_common_api_auth.md"],
         "entities": {
             "Shop": [
@@ -66,6 +66,7 @@ OWNER_SECTION_MAP = [
                 "address",
                 "address_detail",
                 "region",
+                "location_tags",
                 "lat",
                 "lng",
                 "phone",
@@ -96,12 +97,14 @@ OWNER_SECTION_MAP = [
                 "PATCH /owner/shop/payment-method",
                 "PATCH /owner/shop/images",
                 "PATCH /owner/shop/visibility",
-            ]
+            ],
+            "search": ["GET /shops"],
         },
-        "keywords": ["shop", "business-hours", "payment-method", "deposit"],
+        "keywords": ["shop", "business-hours", "payment-method", "deposit", "location_tags", "bbox", "뷰포트 조회"],
         "checkpoints": [
             "MVP는 1사장님=1샵 단수 구조이며 사장님 웹 API는 /owner/shop 기준으로 사용.",
             "auto_accept=true이면 bank_transfer_guide 조합은 백엔드도 VALIDATION_ERROR로 거부.",
+            "유저 앱 지도/목록은 GET /shops의 bbox + location_tag 조합으로 현재 뷰포트 샵을 조회.",
         ],
     },
     {
@@ -143,7 +146,7 @@ OWNER_SECTION_MAP = [
         "id": "4",
         "title": "디자인 등록 및 관리",
         "front_sections": ["4", "4-1", "4-2", "4-3", "4-4", "4-5"],
-        "summary": "디자인 등록, 이미지 업로드, owner_tags, LLM 분석 상태, 재분석, 노출/숨김/삭제.",
+        "summary": "디자인 등록, 디자인 옵션 CRUD, 이미지 업로드, owner_tags, LLM 분석 상태, 재분석, 노출/숨김/삭제.",
         "backend_files": ["spec_text/06_owner_design.md", "spec_text/12_llm.md", "spec_text/16_common_api_auth.md"],
         "entities": {
             "Design": [
@@ -171,6 +174,14 @@ OWNER_SECTION_MAP = [
                 "ai_transform_status",
                 "ai_classify_status",
             ],
+            "DesignOption": [
+                "kind",
+                "name",
+                "price_delta",
+                "duration_delta_min",
+                "sort_order",
+                "is_active",
+            ],
         },
         "apis": {
             "owner_design": [
@@ -178,6 +189,10 @@ OWNER_SECTION_MAP = [
                 "GET /owner/designs",
                 "GET /owner/designs/{design_id}",
                 "PATCH /owner/designs/{design_id}",
+                "GET /shops/me/designs/{design_id}/options",
+                "POST /shops/me/designs/{design_id}/options",
+                "PATCH /shops/me/designs/{design_id}/options/{option_id}",
+                "DELETE /shops/me/designs/{design_id}/options/{option_id}",
                 "POST /owner/designs/{design_id}/images",
                 "DELETE /owner/designs/{design_id}/images/{image_id}",
                 "POST /owner/designs/{design_id}/reanalyze",
@@ -185,10 +200,11 @@ OWNER_SECTION_MAP = [
                 "DELETE /owner/designs/{design_id}",
             ]
         },
-        "keywords": ["design", "llm", "image", "owner_tags", "reanalyze"],
+        "keywords": ["design", "디자인 옵션", "DesignOption", "llm", "image", "owner_tags", "reanalyze"],
         "checkpoints": [
             "디자인 이미지는 프론트와 백엔드 API 모두 최대 5장 제한으로 맞춤.",
             "사장님 화면은 pending+in_progress를 '분석 중' 한 상태로 묶어 표시.",
+            "디자인 옵션 kind/price_delta/duration_delta_min은 예약 total_price와 종료 시각 계산에 직접 반영됨.",
         ],
     },
     {
@@ -209,6 +225,7 @@ OWNER_SECTION_MAP = [
                 "duration_minutes",
                 "status",
                 "total_price",
+                "selected_option_ids",
                 "reservation_policy_snapshot",
                 "payment_method_snapshot",
                 "deposit_amount_snapshot",
@@ -239,17 +256,18 @@ OWNER_SECTION_MAP = [
                 "GET /owner/designers/{id}/schedule",
             ]
         },
-        "keywords": ["reservation", "calendar", "payment-confirmed", "no-show"],
+        "keywords": ["reservation", "calendar", "selected_option_ids", "payment-confirmed", "no-show"],
         "checkpoints": [
             "CSV export는 API 후보가 있지만 MVP 1차 출시 제외로 표시되어야 함.",
             "입금 확인 요청 뱃지는 status/payment snapshot/입금 알림/사장님 확인 시각 4조건을 모두 봄.",
+            "예약 상세에는 유저가 선택한 디자인 옵션(selected_option_ids)과 옵션별 추가 금액/시간을 같이 확인할 수 있어야 함.",
         ],
     },
     {
         "id": "6",
         "title": "리뷰 관리",
         "front_sections": ["6", "6-1", "6-2"],
-        "summary": "본인 샵 리뷰 목록, 평균 별점/리뷰 수, 정렬, 리뷰 답변 작성/수정/삭제.",
+        "summary": "본인 샵 리뷰 목록, 평균 별점/리뷰 수, 정렬, 리뷰 수정/삭제, 리뷰 답변 작성/수정/삭제.",
         "backend_files": ["spec_text/10_reviews.md", "spec_text/07_owner_reservation.md"],
         "entities": {
             "Review": [
@@ -273,16 +291,19 @@ OWNER_SECTION_MAP = [
             "review": [
                 "GET /owner/reviews",
                 "GET /shops/{id}/reviews",
+                "PATCH /reviews/{id}",
+                "DELETE /reviews/{id}",
                 "POST /reviews/{id}/reply",
                 "PATCH /reviews/{id}/reply",
                 "DELETE /reviews/{id}/reply",
             ],
             "owner_dashboard": ["GET /owner/dashboard/summary"],
         },
-        "keywords": ["review", "reply", "rating"],
+        "keywords": ["review", "reply", "rating", "리뷰 수정/삭제", "REVIEW_EDIT_WINDOW_CLOSED"],
         "checkpoints": [
             "사장님 전용 리뷰 목록은 `{api:review:reviews}`를 사용합니다. 사장님 토큰만 있으면 자동으로 내 샵 리뷰만 조회됩니다. `{api:review:reviews}`는 일반 고객용이므로 사장님 웹에서는 쓸 필요 없습니다.",
             "대시보드의 unanswered_review_count는 shop_reply IS NULL 기준.",
+            "유저 작성 리뷰 수정/삭제는 작성 7일 이내만 허용되며, 기간 초과 시 REVIEW_EDIT_WINDOW_CLOSED로 안내.",
         ],
     },
     {
@@ -301,6 +322,8 @@ OWNER_SECTION_MAP = [
                 "tagged_design_id",
                 "tagged_designer_id",
                 "like_count",
+                "save_count",
+                "saved_by_me",
                 "comment_count",
                 "created_at",
             ],
@@ -315,7 +338,12 @@ OWNER_SECTION_MAP = [
             ],
         },
         "apis": {
-            "snap": ["GET /owner/snaps", "GET /shops/{id}/snaps", "GET /snaps/{id}"],
+            "snap": [
+                "GET /owner/snaps",
+                "GET /shops/{id}/snaps",
+                "GET /snaps/{id}",
+                "POST /snails/{snap_id}/save",
+            ],
             "comment_like_follow": [
                 "GET /snaps/{id}/comments",
                 "POST /snaps/{id}/comments",
@@ -323,7 +351,7 @@ OWNER_SECTION_MAP = [
                 "DELETE /comments/{id}",
             ],
         },
-        "keywords": ["snap", "comment", "shop-badge"],
+        "keywords": ["snap", "comment", "shop-badge", "save_count", "saved_by_me"],
         "checkpoints": [
             "사장님 전용 스네일 목록은 `{api:snap:snaps}`를 사용합니다. 사장님 토큰만 있으면 자동으로 내 샵이 태그된 스네일만 조회됩니다. `{api:snap:snaps}`는 일반 유저용이므로 사장님 웹에서는 쓸 필요 없습니다.",
             "샵 계정 댓글은 Comment.author_type/author_shop_id로 구분.",
@@ -416,6 +444,7 @@ IMPLEMENTATION_GUIDES = {
     "4": [
         "이미지 갯수 검증: 디자인 이미지는 최소 1장에서 최대 5장까지만 등록 가능합니다. 프론트의 업로드 UI 컴포넌트에서도 5장이 차면 업로드 버튼을 숨기거나 비활성화해서 백엔드와 정책을 100% 맞춰주세요.",
         "오너 태그(owner_tags) 주의: 사장님이 직접 다는 태그는 반드시 `owner_tags`라는 키로 배열을 묶어서 보내야 합니다. 과거에 썼던 `tags`라는 이름으로 보내면 백엔드에서 무시되니 주의하세요.",
+        "디자인 옵션: 연장/제거/케어 옵션은 `DesignOption.kind`, `price_delta`, `duration_delta_min`으로 관리합니다. 예약 화면의 옵션 선택은 최종 가격과 종료 시각에 반영됩니다.",
         "사용자 노출 조건 안내: 사장님이 디자인을 등록했다고 바로 유저 앱에 노출되지 않습니다. [사장님 계정 승인 + 샵 공개 상태 + 디자인 공개 상태 + AI 분석 완료] 4박자가 모두 맞아야 합니다. 따라서 '공개'로 설정되어 있어도 아직 노출 안 되는 상황이라면, 툴팁이나 배지로 'AI 분석 중이라 아직 노출되지 않습니다' 등을 친절하게 안내해주세요."
     ],
     "5": [
@@ -537,11 +566,13 @@ SCREEN_PLAYBOOKS = {
             "[신규 등록]: 디자인 폼에 이미지(1~5장)와 가격, 설명 등을 채우고 [저장]을 누르면 프론트에서 유효성 검사 후 `{api:owner_design:designs}`를 쏩니다.",
             "[상세 및 폴링]: 디자인 카드를 누르면 `{api:owner_design:designs}`를 호출하여 가장 최신의 AI 분석 상태(status)와 결과값을 화면에 뿌려줍니다.",
             "[수정 처리]: 제목이나 가격, 태그 등을 수정하고 저장할 때는 `{api:owner_design:designs}`를 호출합니다.",
+            "[디자인 옵션]: 옵션 목록은 `GET /shops/me/designs/{design_id}/options`로 읽고, 추가/수정/삭제 버튼은 각각 POST/PATCH/DELETE 옵션 API와 연결합니다.",
             "[사진 교체 시 주의]: 사진을 추가(`POST .../images`)하거나 지울(`DELETE .../images/{id}`) 경우, 백엔드에서 AI 분석 상태를 다시 pending으로 돌려버리므로 화면에서도 뱃지를 즉시 '분석 중 ⏳'으로 덮어씌워야 합니다.",
             "[수동 재분석]: AI가 너무 이상하게 분석했거나 failed 떴을 때 누르는 재분석 버튼은 `{api:owner_design:reanalyze}`를 호출합니다."
         ],
         "ui_events": [
             ["[버튼] 새 디자인 등록", "POST /owner/designs", "등록 성공 토스트와 함께 목록 맨 위로 올려주고, 상태 뱃지는 무조건 'AI 분석 중'으로 달아줍니다.", "가장 흔한 에러인 필수값 누락이나 이미지 0장 업로드 시도는 API를 쏘기 전에 프론트에서 막고 폼 에러를 띄워주세요."],
+            ["[버튼] 디자인 옵션 저장", "POST/PATCH /shops/me/designs/{design_id}/options", "옵션 목록을 다시 불러오고 예약 미리보기 가격/소요시간을 즉시 갱신합니다.", "kind가 extend/removal/care 밖이거나 금액/시간 delta가 음수이면 폼 에러로 표시합니다."],
             ["[버튼] 사진 추가/수정", "POST /owner/designs/{design_id}/images", "새 이미지가 렌더링되면서 동시에 디자인 전체의 뱃지를 '분석 중'으로 강제 전환시켜야 합니다.", "6장째 이미지를 올리려고 하면 파일 브라우저 창을 띄우지 말고 '최대 5장까지만 가능해요' 툴팁을 보여줍니다."],
             ["[버튼] AI 결과 수동 재분석", "POST /owner/designs/{design_id}/reanalyze", "버튼 클릭 즉시 화면 전체 또는 해당 카드를 로딩 스피너/분석 중 배지로 바꿔서 '작업이 들어갔다'는 피드백을 확실히 줍니다.", "수동 재분석이 허용되지 않는 상태(이미 분석 중 등)일 때 프론트에서 버튼을 흐리게(Disabled) 처리했는지 확인하세요."],
             ["[토글] 고객 노출 상태 변경", "PATCH /owner/designs/{design_id}/visibility", "성공하면 스위치가 초록색(ON)으로 바뀌고 리스트 뱃지도 active 갱신됩니다.", "아직 AI 분석이 덜 끝났거나(pending), 사장님 사업자 승인이 안 났다면 토글이 켜지지 않게 프론트에서 막아주세요."]
@@ -1450,6 +1481,7 @@ HTML_TEMPLATE = """<!doctype html>
     const easyFieldMap = {
       verification_status: "사장님 계정이 사업자 인증을 통과했는지 나타냅니다. 승인 전에는 공개/예약 처리를 막는 기준이 됩니다.",
       visibility: "고객에게 보이는지 정하는 공개 상태입니다. draft는 임시저장, active는 공개, hidden은 숨김입니다.",
+      location_tags: "샵이 어느 상권/지역 태그에 묶이는지 나타냅니다. 앱 지도/목록의 location_tag 필터와 연결됩니다.",
       auto_accept: "예약 요청을 사장님 확인 없이 자동으로 받을지 정하는 설정입니다. MVP 기본값은 수동 수락입니다.",
       payment_method: "현장결제인지, 계좌이체 예약금 안내인지 정하는 결제 운영 방식입니다.",
       deposit_amount: "계좌이체 예약금으로 안내할 금액입니다.",
@@ -1457,6 +1489,10 @@ HTML_TEMPLATE = """<!doctype html>
       bank_account_number: "입금 안내에 보여줄 계좌번호입니다.",
       bank_account_holder: "입금 안내에 보여줄 예금주명입니다.",
       owner_tags: "사장님이 직접 붙이는 자유 태그입니다. AI 태그와 별도로 저장해서 검색 의도에 반영합니다.",
+      kind: "디자인 옵션 종류입니다. API 값은 extend, removal, care 중 하나입니다.",
+      price_delta: "옵션 선택 시 기본 가격에 더해지는 금액입니다.",
+      duration_delta_min: "옵션 선택 시 기본 소요 시간에 더해지는 분 단위 시간입니다.",
+      selected_option_ids: "예약 때 유저가 선택한 디자인 옵션 ID 목록입니다.",
       ai_tags: "AI가 표준 태그 사전에서 골라 붙인 태그입니다. 고객 검색과 필터에 사용됩니다.",
       ai_color_palette: "AI가 판단한 대표 색상 목록입니다.",
       ai_style_category: "AI가 판단한 디자인의 큰 스타일 분류입니다.",
@@ -1471,6 +1507,8 @@ HTML_TEMPLATE = """<!doctype html>
       reservation_policy_snapshot: "예약 당시의 운영 정책을 복사해 둔 값입니다. 나중에 샵 설정이 바뀌어도 기존 예약 기준을 보존합니다.",
       payment_method_snapshot: "예약 당시의 결제 방식을 복사해 둔 값입니다.",
       shop_reply: "리뷰에 사장님이 남긴 답변입니다.",
+      save_count: "스네일을 저장한 수입니다.",
+      saved_by_me: "현재 로그인 유저가 이 스네일을 저장했는지 여부입니다.",
       deeplink_target: "알림을 클릭했을 때 이동할 화면 위치입니다.",
     };
 
@@ -1481,10 +1519,15 @@ HTML_TEMPLATE = """<!doctype html>
       "POST /owner/shop": "사장님 샵 초안을 처음 만듭니다. 승인 전에도 저장은 가능하지만 공개는 막습니다.",
       "GET /owner/shop": "내 단수 샵 정보를 불러옵니다.",
       "PATCH /owner/shop": "샵 이름, 주소, 전화번호 같은 기본 정보를 수정합니다.",
+      "GET /shops": "앱 지도/목록에서 bbox와 location_tag로 공개 샵을 조회합니다.",
       "PATCH /owner/shop/visibility": "샵을 고객에게 공개하거나 숨깁니다. 사업자 승인 후에만 공개할 수 있습니다.",
       "POST /owner/designs": "새 디자인을 등록합니다. 화면은 바로 저장되고 AI 분석은 뒤에서 진행됩니다.",
       "GET /owner/designs": "내 디자인 목록을 가져옵니다. 분석 중/실패/숨김 탭 구성에 사용합니다.",
       "PATCH /owner/designs/{design_id}": "디자인 제목, 가격, 소요 시간, 사장님 태그를 수정합니다.",
+      "GET /shops/me/designs/{design_id}/options": "디자인에 붙은 추가 옵션 목록을 가져옵니다.",
+      "POST /shops/me/designs/{design_id}/options": "연장/제거/케어 같은 디자인 옵션을 새로 만듭니다.",
+      "PATCH /shops/me/designs/{design_id}/options/{option_id}": "디자인 옵션의 가격/시간/노출 순서를 수정합니다.",
+      "DELETE /shops/me/designs/{design_id}/options/{option_id}": "더 이상 쓰지 않을 디자인 옵션을 삭제합니다.",
       "POST /owner/designs/{design_id}/images": "디자인 사진을 추가합니다. 총 5장 제한을 넘으면 실패합니다.",
       "POST /owner/designs/{design_id}/reanalyze": "AI 분석 실패 또는 재분석 버튼과 연결됩니다.",
       "PATCH /owner/designs/{design_id}/visibility": "디자인을 고객에게 공개하거나 숨깁니다.",
@@ -1495,7 +1538,10 @@ HTML_TEMPLATE = """<!doctype html>
       "POST /owner/reservations/{id}/complete": "시술 완료 처리 버튼과 연결됩니다.",
       "POST /owner/reservations/{id}/no-show": "고객이 오지 않았을 때 노쇼로 표시합니다. MVP에서는 방어적으로 제한합니다.",
       "GET /owner/reviews": "내 샵 리뷰 목록을 보여줍니다.",
+      "PATCH /reviews/{id}": "유저가 작성 후 7일 이내 리뷰를 수정할 때 쓰는 API입니다.",
+      "DELETE /reviews/{id}": "유저가 작성 후 7일 이내 리뷰를 삭제할 때 쓰는 API입니다.",
       "GET /owner/snaps": "내 샵이 태그된 스네일 게시물을 보여줍니다.",
+      "POST /snails/{snap_id}/save": "스네일 저장 상태를 토글합니다.",
       "GET /owner/dashboard/summary": "대시보드 숫자 카드들을 한 번에 가져옵니다.",
       "GET /owner/notifications": "사장님 알림함 목록을 가져옵니다.",
     };

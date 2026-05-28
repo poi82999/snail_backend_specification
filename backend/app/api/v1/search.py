@@ -41,7 +41,11 @@ def search_query(
     )
 
 
-@router.get("/search", response_model=SearchResult)
+@router.get(
+    "/search",
+    response_model=SearchResult,
+    summary="통합 검색",
+)
 async def search(
     query: Annotated[SearchQuery, Depends(search_query)],
     viewer_user_id: Annotated[UUID | None, Depends(optional_user_id)],

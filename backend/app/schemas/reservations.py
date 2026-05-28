@@ -71,7 +71,13 @@ class ReservationMe(BaseModel):
     assigned_by: AssignedBy
     start_at: datetime
     end_at: datetime
-    status: ReservationStatus
+    status: ReservationStatus = Field(
+        description=(
+            "예약 상태. 허용값: pending, payment_pending, confirmed, rejected, "
+            "cancelled_by_user, cancelled_by_shop, no_show, completed."
+        ),
+        examples=["pending", "confirmed", "completed"],
+    )
     user_request: str | None = None
     selected_option_ids: list[UUID] = Field(default_factory=list)
     total_price: int
