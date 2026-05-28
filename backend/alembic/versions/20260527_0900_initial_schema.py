@@ -37,7 +37,7 @@ def upgrade() -> None:
             password_hash TEXT NOT NULL,
             representative_name VARCHAR(80) NOT NULL,
             phone_number VARCHAR(30) NOT NULL,
-            verification_status VARCHAR(30) NOT NULL DEFAULT 'pending',
+            verification_status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
             verification_rejected_reason TEXT,
             login_failed_count INTEGER NOT NULL DEFAULT 0,
             locked_until TIMESTAMPTZ,
@@ -45,7 +45,7 @@ def upgrade() -> None:
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             CONSTRAINT ck_owners_verification_status
-              CHECK (verification_status IN ('pending','approved','rejected'))
+              CHECK (verification_status IN ('PENDING','APPROVED','REJECTED'))
         );
 
         CREATE TABLE business_verifications (
@@ -53,13 +53,13 @@ def upgrade() -> None:
             owner_id UUID NOT NULL REFERENCES owners(id),
             business_registration_number VARCHAR(40) NOT NULL,
             document_url TEXT NOT NULL,
-            status VARCHAR(30) NOT NULL DEFAULT 'pending',
+            status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
             reviewed_at TIMESTAMPTZ,
             rejected_reason TEXT,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             CONSTRAINT ck_business_verifications_status
-              CHECK (status IN ('pending','approved','rejected'))
+              CHECK (status IN ('PENDING','APPROVED','REJECTED'))
         );
 
         CREATE TABLE password_reset_tokens (
@@ -96,10 +96,10 @@ def upgrade() -> None:
             phone_number VARCHAR(30) NOT NULL,
             introduction TEXT,
             thumbnail_url TEXT,
-            visibility VARCHAR(30) NOT NULL DEFAULT 'draft',
+            visibility VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
             auto_accept BOOLEAN NOT NULL DEFAULT false,
             reservation_policy TEXT,
-            payment_method VARCHAR(40) NOT NULL DEFAULT 'on_site',
+            payment_method VARCHAR(40) NOT NULL DEFAULT 'ON_SITE',
             deposit_amount INTEGER,
             bank_name VARCHAR(80),
             bank_account_number VARCHAR(80),
@@ -109,15 +109,15 @@ def upgrade() -> None:
             favorite_count INTEGER NOT NULL DEFAULT 0,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            CONSTRAINT ck_shops_visibility CHECK (visibility IN ('draft','active','hidden')),
+            CONSTRAINT ck_shops_visibility CHECK (visibility IN ('DRAFT','ACTIVE','HIDDEN')),
             CONSTRAINT ck_shops_payment_method
-              CHECK (payment_method IN ('on_site','bank_transfer_guide')),
+              CHECK (payment_method IN ('ON_SITE','BANK_TRANSFER_GUIDE')),
             CONSTRAINT ck_shops_auto_accept_payment
-              CHECK (NOT auto_accept OR payment_method = 'on_site'),
+              CHECK (NOT auto_accept OR payment_method = 'ON_SITE'),
             CONSTRAINT ck_shops_deposit
               CHECK (
-                (payment_method = 'on_site' AND deposit_amount IS NULL)
-                OR (payment_method = 'bank_transfer_guide' AND deposit_amount >= 1000)
+                (payment_method = 'ON_SITE' AND deposit_amount IS NULL)
+                OR (payment_method = 'BANK_TRANSFER_GUIDE' AND deposit_amount >= 1000)
               )
         );
 
@@ -191,8 +191,8 @@ def upgrade() -> None:
             base_price INTEGER NOT NULL,
             duration_minutes INTEGER NOT NULL,
             thumbnail_url TEXT,
-            visibility VARCHAR(30) NOT NULL DEFAULT 'draft',
-            ai_analysis_status VARCHAR(30) NOT NULL DEFAULT 'pending',
+            visibility VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+            ai_analysis_status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
             owner_tags VARCHAR(40)[] NOT NULL DEFAULT '{}',
             ai_tags VARCHAR(40)[] NOT NULL DEFAULT '{}',
             color_palette VARCHAR(40)[] NOT NULL DEFAULT '{}',
@@ -206,9 +206,9 @@ def upgrade() -> None:
             deleted_at TIMESTAMPTZ,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            CONSTRAINT ck_designs_visibility CHECK (visibility IN ('draft','active','hidden')),
+            CONSTRAINT ck_designs_visibility CHECK (visibility IN ('DRAFT','ACTIVE','HIDDEN')),
             CONSTRAINT ck_designs_ai_status
-              CHECK (ai_analysis_status IN ('pending','in_progress','done','failed')),
+              CHECK (ai_analysis_status IN ('PENDING','IN_PROGRESS','DONE','FAILED')),
             CONSTRAINT ck_designs_price CHECK (base_price >= 0),
             CONSTRAINT ck_designs_duration CHECK (duration_minutes > 0)
         );
@@ -240,10 +240,10 @@ def upgrade() -> None:
             shop_id UUID NOT NULL REFERENCES shops(id),
             design_id UUID NOT NULL REFERENCES designs(id),
             designer_id UUID NOT NULL REFERENCES designers(id),
-            assigned_by VARCHAR(30) NOT NULL DEFAULT 'auto',
+            assigned_by VARCHAR(30) NOT NULL DEFAULT 'AUTO',
             start_at TIMESTAMPTZ NOT NULL,
             end_at TIMESTAMPTZ NOT NULL,
-            status VARCHAR(40) NOT NULL DEFAULT 'pending',
+            status VARCHAR(40) NOT NULL DEFAULT 'PENDING',
             user_request TEXT,
             total_price INTEGER NOT NULL,
             payment_method_snapshot VARCHAR(40) NOT NULL,
@@ -262,11 +262,11 @@ def upgrade() -> None:
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             CONSTRAINT uq_reservations_idempotency_key UNIQUE (idempotency_key),
             CONSTRAINT ck_reservations_time CHECK (end_at > start_at),
-            CONSTRAINT ck_reservations_assigned_by CHECK (assigned_by IN ('user','auto','owner')),
+            CONSTRAINT ck_reservations_assigned_by CHECK (assigned_by IN ('USER','AUTO','OWNER')),
             CONSTRAINT ck_reservations_status CHECK (
               status IN (
-                'pending','payment_pending','confirmed','rejected','cancelled_by_user',
-                'cancelled_by_shop','no_show','completed'
+                'PENDING','PAYMENT_PENDING','CONFIRMED','REJECTED','CANCELLED_BY_USER',
+                'CANCELLED_BY_SHOP','NO_SHOW','COMPLETED'
               )
             )
         );
@@ -352,7 +352,7 @@ def upgrade() -> None:
             deleted_at TIMESTAMPTZ,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-            CONSTRAINT ck_comments_author_type CHECK (author_type IN ('user','owner','admin','system')),
+            CONSTRAINT ck_comments_author_type CHECK (author_type IN ('USER','OWNER','ADMIN','SYSTEM')),
             CONSTRAINT ck_comments_depth CHECK (depth BETWEEN 1 AND 2)
         );
 
@@ -407,8 +407,8 @@ def upgrade() -> None:
             target_id UUID NOT NULL,
             reason VARCHAR(80) NOT NULL,
             detail TEXT,
-            status VARCHAR(30) NOT NULL DEFAULT 'pending',
-            action VARCHAR(30) NOT NULL DEFAULT 'none',
+            status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+            action VARCHAR(30) NOT NULL DEFAULT 'NONE',
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
@@ -418,7 +418,7 @@ def upgrade() -> None:
             design_id UUID NOT NULL REFERENCES designs(id),
             design_image_id UUID REFERENCES design_images(id),
             job_type VARCHAR(30) NOT NULL,
-            status VARCHAR(30) NOT NULL DEFAULT 'queued',
+            status VARCHAR(30) NOT NULL DEFAULT 'QUEUED',
             attempts INTEGER NOT NULL DEFAULT 0,
             request_payload JSONB,
             response_payload JSONB,
@@ -451,7 +451,7 @@ def upgrade() -> None:
             recipient_user_id UUID REFERENCES users(id),
             recipient_owner_id UUID REFERENCES owners(id),
             channel VARCHAR(40) NOT NULL,
-            status VARCHAR(30) NOT NULL DEFAULT 'queued',
+            status VARCHAR(30) NOT NULL DEFAULT 'QUEUED',
             template_code VARCHAR(120),
             payload JSONB,
             provider_message_id VARCHAR(160),
@@ -489,7 +489,7 @@ def upgrade() -> None:
             designer_id WITH =,
             tstzrange(start_at, end_at, '[)') WITH &&
           )
-          WHERE (status IN ('payment_pending', 'confirmed'));
+          WHERE (status IN ('PAYMENT_PENDING', 'CONFIRMED'));
 
         ALTER TABLE reservations
           ADD CONSTRAINT ex_reservations_user_active_overlap
@@ -497,7 +497,7 @@ def upgrade() -> None:
             user_id WITH =,
             tstzrange(start_at, end_at, '[)') WITH &&
           )
-          WHERE (status IN ('pending', 'payment_pending', 'confirmed'));
+          WHERE (status IN ('PENDING', 'PAYMENT_PENDING', 'CONFIRMED'));
 
         CREATE INDEX ix_shops_region_trgm ON shops USING gin (region gin_trgm_ops);
         CREATE INDEX ix_designs_title_trgm ON designs USING gin (title gin_trgm_ops);
@@ -512,7 +512,7 @@ def upgrade() -> None:
         CREATE INDEX ix_owner_notifications_unread
           ON owner_notifications (owner_id, created_at DESC) WHERE read_at IS NULL;
         CREATE INDEX ix_notification_deliveries_retry
-          ON notification_deliveries (status, next_retry_at) WHERE status = 'failed';
+          ON notification_deliveries (status, next_retry_at) WHERE status = 'FAILED';
         """
     )
 
