@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GITHUB_BLOB_BASE = "https://github.com/poi82999/snail_backend_specification/blob/main"
 SPEC_TEXT_DIR = ROOT / "spec_text"
+CANONICAL_PATH = ROOT / "spec_canonical" / "backend_spec_v3.canonical.json"
 FRONT_SPEC_PATH = ROOT / "references" / "snail_owner_webapp_spec_v1.md"
 OUTPUT_DIR = ROOT / "outputs"
 DOCS_DIR = ROOT / "docs"
@@ -855,7 +856,8 @@ def link_for_source(source_file, line=None):
     return f"{GITHUB_BLOB_BASE}/{source_file}{suffix}"
 
 
-def resolve_mapping(mapping, backend, front_sections):
+def resolve_mapping(mapping, backend, front_sections, annotations=None):
+    annotations = annotations or {}
     front_lookup = {section["id"]: section for section in front_sections}
     resolved_sections = [front_lookup[key] for key in mapping["front_sections"] if key in front_lookup]
     missing_front_sections = [key for key in mapping["front_sections"] if key not in front_lookup]
@@ -868,12 +870,18 @@ def resolve_mapping(mapping, backend, front_sections):
         if not entity_data:
             missing_refs.append(f"entity:{entity}")
             continue
+        entity_notes = annotations.get(entity, {})
         for field in fields:
             field_data = entity_data["fields"].get(field)
             if not field_data:
                 missing_refs.append(f"field:{entity}.{field}")
                 continue
-            field_refs.append({**field_data, "entity": entity, "href": link_for_source(field_data["source_file"], field_data["line"])})
+            field_refs.append({
+                **field_data,
+                "entity": entity,
+                "href": link_for_source(field_data["source_file"], field_data["line"]),
+                "team_note": entity_notes.get(field, ""),
+            })
 
     for group, endpoints in mapping.get("apis", {}).items():
         group_data = backend["apis"].get(group)
@@ -1056,12 +1064,23 @@ def build_index():
         raise FileNotFoundError(f"프론트 명세서를 찾을 수 없습니다: {FRONT_SPEC_PATH}")
     frontend_sections = extract_front_sections(FRONT_SPEC_PATH)
     backend = load_backend_data()
-    mappings = [resolve_mapping(item, backend, frontend_sections) for item in OWNER_SECTION_MAP]
+    annotations = {}
+    if CANONICAL_PATH.exists():
+        with CANONICAL_PATH.open(encoding="utf-8") as f:
+            canonical = json.load(f)
+        annotations = canonical.get("collaborator_annotations", {}).get("entities", {})
+    mappings = [resolve_mapping(item, backend, frontend_sections, annotations) for item in OWNER_SECTION_MAP]
 
     all_fields = []
     for entity, entity_data in sorted(backend["entities"].items()):
+        entity_notes = annotations.get(entity, {})
         for field in entity_data["fields"].values():
-            all_fields.append({**field, "entity": entity, "href": link_for_source(field["source_file"], field["line"])})
+            all_fields.append({
+                **field,
+                "entity": entity,
+                "href": link_for_source(field["source_file"], field["line"]),
+                "team_note": entity_notes.get(field["name"], ""),
+            })
 
     all_apis = []
     for group, group_data in sorted(backend["apis"].items()):
@@ -1594,6 +1613,7 @@ HTML_TEMPLATE = """<!doctype html>
           <td><code>${escapeHtml(ref.entity)}.${escapeHtml(ref.name)}</code></td>
           <td>${escapeHtml(easyField(ref))}</td>
           <td>${escapeHtml(ref.note)}</td>
+          <td class="team-note">${escapeHtml(ref.team_note || "")}</td>
           <td>${sourceLink(ref)}</td>
         </tr>
       `).join("");
@@ -1627,7 +1647,7 @@ HTML_TEMPLATE = """<!doctype html>
           <div class="panel"><h3>프론트 섹션</h3><table><thead><tr><th>ID</th><th>제목</th><th>라인</th></tr></thead><tbody>${frontRows || "<tr><td colspan='3'>연결된 섹션 없음</td></tr>"}</tbody></table></div>
           <div class="panel"><h3>체크 포인트</h3>${checkpoints}</div>
           ${missingPanel}
-          <div class="panel full"><h3>관련 필드</h3><table><thead><tr><th>필드</th><th>쉽게 말하면</th><th>원문 메모</th><th>출처</th></tr></thead><tbody>${fieldRows || "<tr><td colspan='4'>관련 필드 없음</td></tr>"}</tbody></table></div>
+          <div class="panel full"><h3>관련 필드</h3><table><thead><tr><th>필드</th><th>쉽게 말하면</th><th>원문 메모</th><th>팀 메모</th><th>출처</th></tr></thead><tbody>${fieldRows || "<tr><td colspan='5'>관련 필드 없음</td></tr>"}</tbody></table></div>
           <div class="panel full"><h3>관련 API</h3><table><thead><tr><th>엔드포인트</th><th>쉽게 말하면</th><th>원문 용도</th><th>요청값</th><th>출처</th></tr></thead><tbody>${apiRows || "<tr><td colspan='5'>관련 API 없음</td></tr>"}</tbody></table></div>
           <div class="panel full"><h3>프론트 명세 발췌</h3><div class="excerpt">${escapeHtml(excerpt || "발췌 없음")}</div></div>
         </div>

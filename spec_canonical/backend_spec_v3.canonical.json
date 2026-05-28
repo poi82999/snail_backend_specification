@@ -42,7 +42,8 @@
     {
       "topic": "문서 버전 전략",
       "decision_needed": "v3를 계속 수정할지, v4 파일로 분리해 확정본을 만들지 결정",
-      "owner": "팀 내부"
+      "owner": "팀 내부",
+      "answer": "필요 없음"
     },
     {
       "topic": "향후 결제 기능 범위",
@@ -242,7 +243,7 @@
   ],
   "policies": {
     "search": [
-      "검색 엔진: Elasticsearch + nori (MVP부터 도입)",
+      "검색 엔진: PostgreSQL pg_trgm + pgvector (OpenAI embedding) + ai_tags ARRAY GIN. ES는 MVP 미도입, 데이터 누적 시 재검토",
       "검색 결과 범위는 디자인, 샵, 리뷰",
       "날짜 조건은 검색에서 제외하고 상세/예약 화면에서 가용 시간 조회",
       "찜한 사람 수 표시",
@@ -2795,7 +2796,7 @@
     ],
     [
       "검색 엔진 채택",
-      "Elasticsearch + nori 플러그인을 MVP부터 도입. 한국어 형태소 분석 필수, 필드 부스팅·BM25·function_score·geo_distance·fuzziness·synonym 등 native 지원. Postgres FTS/Meilisearch는 한국어 정확도 약해 비채택. 자체 호스팅 Docker로 시작 가능($0 추가 비용), 추후 매니지드 이전 검토"
+      "MVP는 PostgreSQL 기반(pg_trgm 오타 보정 + ai_tags ARRAY GIN 키워드 매칭 + pgvector(OpenAI text-embedding-3-small, 1536d) 의미 검색). 한국어 형태소 분석은 ai_tags를 LLM이 분석 단계에서 동의어/분위기 태그까지 풍부하게 부여하는 방식으로 대체. 운영 부담(JVM 메모리/별도 인덱싱 파이프라인/GCP managed 없음)과 1인 운영을 고려해 ES + nori는 MVP 미도입. 디자인 5K+ 또는 검색 p95 > 500ms 시점에 ES 재검토"
     ],
     [
       "검색 필드 가중치 (시작값)",
@@ -2924,5 +2925,150 @@
       "회신 마감일",
       "주간 미팅 일정"
     ]
+  },
+  "collaborator_annotations": {
+    "_meta": {
+      "source_file": "snail_백엔드_협업명세서_v3_20260527_1825.xlsx",
+      "imported_at": "2026-05-27",
+      "cell_count": 81
+    },
+    "entities": {
+      "User": {
+        "user_id": "내부 식별값. 화면 노출 없음",
+        "auth_method": "Apple Sign In + 구글 로그인 + dev 로그인",
+        "apple_user_id": "내부 식별값. 화면 노출 없음\n구글",
+        "nickname": "닉네임: 한글/영문/숫자, 2~12자. 중복 불가, 공백 불가. 욕설/금칙어 필터링은 P1",
+        "profile_image_url": "선택. 미입력 시 기본 아바타 표시.\n-> 달팽이 아바타 이미지 만들어야됨",
+        "bio": "프로필 탭에서는 안보이고,",
+        "preferred_tags": "선택. 최대 5개. 표준 태그 사전에서만 선택 (자유 입력 X). 온보딩에서 입력 권유",
+        "device_token": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인 / 앱 실행 시 자동 갱신",
+        "app_version": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인 / 강제 업데이트 정책은 P1",
+        "created_at": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인"
+      },
+      "Owner": {
+        "owner_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "email": "이메일 형식 검증 필수. 중복 가입 불가. 인증 메일 발송은 P1",
+        "password": "최소 8자, 영문+숫자 조합. 특수문자 권장. 비밀번호 변경 P1",
+        "owner_name": "한글 2~20자, 사업자등록증과 일치해야 함",
+        "phone": "010-XXXX-XXXX 형식. SMS 인증 P1",
+        "business_number": "10자리 숫자, 국세청 형식 검증. 외부 검증 API는 P1 (MVP는 어드민 수동 검토)",
+        "business_license_image": "이미지/PDF, 최대 10MB. 어드민 검토용. 승인 후에도 보관",
+        "verification_status": "pending/approved/rejected. 승인 전엔 샵 등록만 가능, 디자인/예약은 X"
+      },
+      "Designer": {
+        "designer_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "shop_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "name": "디자이너 이름. 한글/영문 1~15자",
+        "career_years": "선택. 0~50년. 미입력 시 프로필에서 숨김",
+        "rank": "선택. 표준 풀에서 선택 (원장/실장/디자이너/주니어). 자유 입력 X",
+        "profile_image_url": "선택. 미입력 시 기본 아바타",
+        "specialty_tags": "선택. 최대 5개. 표준 태그 사전에서 선택",
+        "is_active": "기본 true. 비활성 시 가용 슬롯 계산에서 제외. 삭제 대신 비활성화 권장"
+      },
+      "DesignImage": {
+        "image_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "design_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "original_url": "JPG/PNG/HEIC, 최대 10MB/장, 디자인당 1~5장",
+        "cropped_url": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인 / LLM Transform 결과",
+        "sort_order": "0부터 시작. 0번이 대표 이미지. 사장님이 드래그로 순서 변경 가능",
+        "ai_transform_status": "pending/processing/success/failed. 실패해도 디자인 노출에 영향 X",
+        "ai_classify_status": "pending/processing/success/failed. 동일"
+      },
+      "Snap": {
+        "snap_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "author_user_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인 / 작성자만 수정/삭제 가능",
+        "caption": "선택. 최대 500자. 미입력 시 본문 영역 숨김. 금칙어는 P1",
+        "image_urls": "1~10장. JPG/PNG/HEIC, 장당 최대 10MB",
+        "tags": "최대 8개. 표준 태그 사전에서 선택",
+        "tagged_shop_id": "선택. 1개만. 검색/탐색용",
+        "tagged_design_id": "선택. 1개만. 디자인 상세에 노출되는 조건",
+        "tagged_designer_id": "선택. 1개만",
+        "tagged_reservation_id": "선택. 본인의 completed 예약만 연결 가능. 연결 시 '인증 스네일' 뱃지",
+        "like_count": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "comment_count": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "view_count": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "popularity_score": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인 / 좋아요×3 + 댓글×2 + 조회×0.1 + 최신성 가중치 (초안)",
+        "status": "active/hidden/deleted. hidden은 어드민/작성자 처리",
+        "created_at": "내부 식별값. 화면 노출 없음."
+      },
+      "Comment": {
+        "comment_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "snap_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "parent_comment_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인 / depth 2까지만 (대댓글까지). 대대댓글 X",
+        "author_type": "user/shop. 샵 계정도 댓글 가능 (의사결정기록 4번 참조)",
+        "author_user_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "author_shop_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "content": "최대 300자. 금칙어/도배 방지는 P1",
+        "like_count": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "status": "active/hidden/deleted. 삭제된 댓글은 '삭제된 댓글입니다' 표시",
+        "created_at": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인"
+      },
+      "Review": {
+        "review_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "reservation_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인 / 1예약=1리뷰 UNIQUE 제약",
+        "author_user_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "shop_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "design_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "rating": "1~5점, 정수만. 0점 또는 소수점 X",
+        "content": "최소 10자, 최대 1,000자",
+        "image_urls": "선택. 0~5장. JPG/PNG/HEIC, 장당 최대 10MB",
+        "tags": "선택. 최대 5개. 표준 태그 사전에서 선택 (예: 친절함, 분위기 좋음)",
+        "shop_reply": "선택. 사장님만 작성. 최대 500자. 1리뷰당 1답변",
+        "shop_reply_at": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "like_count": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "status": "active/hidden/deleted. 작성 후 7일 내 수정/삭제 가능",
+        "created_at": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인"
+      },
+      "Report": {
+        "report_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "reporter_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인 / 동일 신고자가 같은 대상 24시간 내 중복 신고 불가",
+        "target_type": "snap/comment/review/user/shop",
+        "target_id": "내부 식별값. 화면 노출 없음. → 프론트(곽민지) 확인",
+        "reason_code": "선택지 (MVP):\n- spam (스팸/광고)\n- inappropriate (부적절/혐오)\n- false_info (허위정보)\n- impersonation (사칭)\n- copyright (저작권 침해)\n- other (기타)\n→ 디자이너 UI 문구 협의",
+        "reason_detail": "선택. 최대 500자",
+        "status": "pending/reviewing/resolved/dismissed",
+        "resolved_action": "hide/delete/warn/ban/none. 어드민이 처리 후 입력"
+      }
+    },
+    "freeform_notes": {
+      "3.유저(앱)_회원": [
+        {
+          "cell": "A20",
+          "text": "커뮤니티 탭 프로필이랑 자기소개 필요"
+        }
+      ]
+    }
+  },
+  "llm_collaborator_input": {
+    "transform": {
+      "purpose": "원본 사진에서 네일 영역 추출 + 정사각형 정규화 (동일)",
+      "suggested_endpoint": "그대로 사용 OK / 비동기 처리이므로 큐 기반으로 운영",
+      "request_fields": "input:\n- image_url (string): 원본 이미지 URL (S3)\n- image_id (string): 백엔드가 부여하는 식별자\n- callback_url (string): 분석 완료 시 호출\n- options.output_size (int, default=1024): 정사각형 한 변 길이\n- options.background (enum: white/transparent, default=white)\n※ 그대로 수용. 추가 필드 없음.",
+      "response_fields": "output (예시):\n- image_id (string): 요청과 동일한 ID 에코\n- status (enum: success / failed)\n- cropped_image_url (string): 처리된 이미지 URL\n- cropped_image_size (int): 한 변 크기\n- confidence (float): 0.0~1.0\n- nail_count_detected (int): 감지된 손톱 수\n- processing_time_ms (int)\n- error_code (string, optional): 실패 시\n※ 그대로 수용 OK.",
+      "recommendation": "비동기 callback 권장 (Module 1 합쳐 1~10분 소요).\n동기 5초 기준은 못 맞춤 → 큐+webhook 방식으로 운영.\n사용자 노출엔 영향 없음 (분석 안 끝나도 사장님 태그로 노출)."
+    },
+    "classify": {
+      "purpose": "cropped 이미지에서 태그/색상/스타일/분위기 분류 (동일)",
+      "suggested_endpoint": "그대로 사용 OK / 비동기 처리",
+      "request_fields": "input:\n- image_url (string): cropped 이미지 URL\n- image_id (string)\n- locale (string, default=\"ko\"): 한글/영문 태그 반환 결정\n- options.max_tags (int, default=5)\n- options.include_color_palette (bool, default=true)\n- options.include_style_category (bool, default=true)\n※ 그대로 수용 OK.",
+      "response_fields": "output (예시):\n- image_id (string)\n- status (enum: success / failed)\n- tags (string[]): 표준 태그 사전 내 값 (최대 5개)\n- color_palette ({hex, name_ko}[]): 주요 색상 (최대 3개)\n- style_category (enum): simple/glamour/classic/trendy/chic 중 1개\n- nail_shape (enum): 표준 사전 값\n- mood (string, optional): 분위기 태그 (단일)\n- season (string, optional): 계절 태그 (단일)\n- confidence_overall (float)\n- processing_time_ms (int)\n※ 베이스는 백엔드 제안과 동일.\nmood/season 별도 필드로 분리 요청 (시나리오에 자주 등장)."
+    },
+    "standard_tags": {
+      "style": "제안 그대로 OK. 운영하며 새 트렌드 발견 시 추가 가능 (Y2K, 청키 등)",
+      "color": "제안 그대로 OK. hex 코드와 한글 라벨 동시 반환 (예: {\"hex\":\"#FFB6C1\",\"name\":\"핑크\"})",
+      "mood": "제안 그대로 OK. 봄/여름/가을/겨울은 mood가 아닌 season으로 분리 권장",
+      "technique": "제안에서 일부 조정 필요.\n'페디큐어/연장/케어/제거'는 시술 카테고리라 디자인 태그로는 부적합.\n디자인용으로는 '젤, 매니큐어, 페디큐어' 정도만 사용 권장.\n나머지는 샵 메타데이터로 분리하는 게 좋음.",
+      "shape": "제안 그대로 OK.",
+      "style_category": "제안 그대로 OK. 영문 키 유지 (UI 표시는 한글 라벨 매핑 테이블로 처리)",
+      "occasion": "제안 그대로 OK."
+    },
+    "error_codes": {
+      "NO_NAIL": "코드명 변경 제안: NO_NAIL → NAIL_NOT_DETECTED (더 명확)\n메시지 OK.",
+      "LOW_QUALITY": "그대로 OK.",
+      "MULTIPLE_HANDS": "그대로 OK.",
+      "OBSTRUCTED": "그대로 OK.",
+      "INAPPROPRIATE": "그대로 OK.\n부적절 콘텐츠 감지 시 어드민 알림 함께 발송 권장.",
+      "INTERNAL_ERROR": "그대로 OK.\n백엔드는 INTERNAL_ERROR만 재시도, 나머지는 사장님에게 즉시 노출."
+    }
   }
 }

@@ -421,7 +421,9 @@ def collaborator_prompt(entity, name, required):
     return "화면에서 입력·표시·수정 가능 여부를 확인해주세요."
 
 
-def field_rows(fields, entity):
+def field_rows(fields, entity, annotations=None):
+    annotations = annotations or {}
+    entity_notes = annotations.get(entity, {}) if annotations else {}
     return [
         [
             name,
@@ -431,7 +433,7 @@ def field_rows(fields, entity):
             field_meaning(entity, name, note_text),
             required_help(required),
             collaborator_prompt(entity, name, required),
-            "",
+            entity_notes.get(name, ""),
         ]
         for name, typ, required, note_text in fields
     ]
@@ -457,7 +459,7 @@ def add_field_sheet(wb, name, sheet_title, subtitle, entities, data):
             ws,
             r,
             ["백엔드 필드명", "화면 라벨/표현", "타입", "필수?", "필드 의미", "입력/생성 방식", "협업자 확인 사항", "추가 요청/결정"],
-            field_rows(data["entities"][entity], entity),
+            field_rows(data["entities"][entity], entity, data.get("collaborator_annotations", {}).get("entities", {})),
             review_cols=[2, 7, 8],
             widths=[22, 20, 14, 10, 42, 36, 42, 28],
         )
@@ -519,7 +521,7 @@ def append_field_groups(ws, entities, data):
             ws,
             r,
             ["백엔드 필드명", "화면 라벨/표현", "타입", "필수?", "필드 의미", "입력/생성 방식", "협업자 확인 사항", "추가 요청/결정"],
-            field_rows(data["entities"][entity], entity),
+            field_rows(data["entities"][entity], entity, data.get("collaborator_annotations", {}).get("entities", {})),
             review_cols=[2, 7, 8],
             widths=[22, 20, 14, 10, 42, 36, 42, 28],
         )
@@ -659,28 +661,33 @@ def add_llm(wb, data):
     r = add_page_guide(ws, data, "12.LLM명세", r)
     note(ws, r, "LLM 명세는 가장 중요한 협업 지점입니다. 태그 사전은 검색 품질과 직접 연결됩니다.", fill=WARN_FILL, height=48)
     r += 2
+    llm_input = data.get("llm_collaborator_input", {})
     for key, label in [("transform", "1단계 Transform"), ("classify", "2단계 Classification")]:
         spec = data["llm"][key]
+        section_input = llm_input.get(key, {})
         section(ws, r, label)
         r += 1
         rows = [
-            ["목적", spec["purpose"], ""],
-            ["제안 endpoint", spec["suggested_endpoint"], ""],
-            ["Request fields", ", ".join(spec["request_fields"]), ""],
-            ["Response fields", ", ".join(spec["response_fields"]), ""],
+            ["목적", spec["purpose"], section_input.get("purpose", "")],
+            ["제안 endpoint", spec["suggested_endpoint"], section_input.get("suggested_endpoint", "")],
+            ["Request fields", ", ".join(spec["request_fields"]), section_input.get("request_fields", "")],
+            ["Response fields", ", ".join(spec["response_fields"]), section_input.get("response_fields", "")],
         ]
         if "recommendation" in spec:
-            rows.append(["운영 권장", spec["recommendation"], ""])
+            rows.append(["운영 권장", spec["recommendation"], section_input.get("recommendation", "")])
         r = table(ws, r, ["항목", "내용", "LLM 측 확정값"], rows, review_cols=[3], widths=[22, 84, 36])
         r += 2
     section(ws, r, "표준 태그 사전")
     r += 1
-    tag_rows = [[k, ", ".join(v), ""] for k, v in data["llm"]["standard_tags"].items()]
+    tag_input = llm_input.get("standard_tags", {})
+    tag_rows = [[k, ", ".join(v), tag_input.get(k, "")] for k, v in data["llm"]["standard_tags"].items()]
     r = table(ws, r, ["카테고리", "백엔드 제안", "LLM 측 확정"], tag_rows, review_cols=[3], widths=[22, 92, 36])
     r += 2
     section(ws, r, "에러 코드")
     r += 1
-    r = table(ws, r, ["코드", "상황", "사장님 노출 메시지", "LLM 측 수정"], [row + [""] for row in data["llm"]["error_codes"]], review_cols=[4], widths=[20, 36, 70, 24])
+    err_input = llm_input.get("error_codes", {})
+    err_rows = [row + [err_input.get(row[0], "")] for row in data["llm"]["error_codes"]]
+    r = table(ws, r, ["코드", "상황", "사장님 노출 메시지", "LLM 측 수정"], err_rows, review_cols=[4], widths=[20, 36, 70, 24])
     r += 2
     section(ws, r, "LLM 작업자 작성 필요 질문")
     r += 1
@@ -708,7 +715,7 @@ def add_decisions(wb, data):
     section(ws, r, "팀 내부 결정 필요 사항", 4)
     r += 1
     pending_rows = [
-        [item["topic"], item["decision_needed"], item["owner"], ""]
+        [item["topic"], item["decision_needed"], item["owner"], item.get("answer", "")]
         for item in data["internal_decisions_needed"]
     ]
     table(ws, r, ["주제", "결정 필요", "담당", "결정/메모"], pending_rows, review_cols=[4], widths=[26, 72, 18, 30])

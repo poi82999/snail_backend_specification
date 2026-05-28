@@ -126,7 +126,7 @@
     ],
     [
       "검색 엔진 채택",
-      "Elasticsearch + nori 플러그인을 MVP부터 도입. 한국어 형태소 분석 필수, 필드 부스팅·BM25·function_score·geo_distance·fuzziness·synonym 등 native 지원. Postgres FTS/Meilisearch는 한국어 정확도 약해 비채택. 자체 호스팅 Docker로 시작 가능($0 추가 비용), 추후 매니지드 이전 검토"
+      "MVP는 PostgreSQL 기반(pg_trgm 오타 보정 + ai_tags ARRAY GIN 키워드 매칭 + pgvector(OpenAI text-embedding-3-small, 1536d) 의미 검색). 한국어 형태소 분석은 ai_tags를 LLM이 분석 단계에서 동의어/분위기 태그까지 풍부하게 부여하는 방식으로 대체. 운영 부담(JVM 메모리/별도 인덱싱 파이프라인/GCP managed 없음)과 1인 운영을 고려해 ES + nori는 MVP 미도입. 디자인 5K+ 또는 검색 p95 > 500ms 시점에 ES 재검토"
     ],
     [
       "검색 필드 가중치 (시작값)",
@@ -217,7 +217,8 @@
     {
       "topic": "문서 버전 전략",
       "decision_needed": "v3를 계속 수정할지, v4 파일로 분리해 확정본을 만들지 결정",
-      "owner": "팀 내부"
+      "owner": "팀 내부",
+      "answer": "필요 없음"
     },
     {
       "topic": "향후 결제 기능 범위",
@@ -302,7 +303,7 @@
   ],
   "policies": {
     "search": [
-      "검색 엔진: Elasticsearch + nori (MVP부터 도입)",
+      "검색 엔진: PostgreSQL pg_trgm + pgvector (OpenAI embedding) + ai_tags ARRAY GIN. ES는 MVP 미도입, 데이터 누적 시 재검토",
       "검색 결과 범위는 디자인, 샵, 리뷰",
       "날짜 조건은 검색에서 제외하고 상세/예약 화면에서 가용 시간 조회",
       "찜한 사람 수 표시",

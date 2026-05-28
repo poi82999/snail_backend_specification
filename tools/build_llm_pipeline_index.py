@@ -5,6 +5,7 @@ from pathlib import Path
 from build_owner_webapp_index import (
     ROOT,
     SPEC_TEXT_DIR,
+    CANONICAL_PATH,
     extract_front_sections,
     extract_spec_data_blocks,
     find_line,
@@ -442,7 +443,8 @@ def file_refs_for(paths):
     return refs
 
 
-def resolve_field_refs(mapping, backend):
+def resolve_field_refs(mapping, backend, annotations=None):
+    annotations = annotations or {}
     refs = []
     missing = []
     for entity, fields in mapping.get("entities", {}).items():
@@ -450,6 +452,7 @@ def resolve_field_refs(mapping, backend):
         if not entity_data:
             missing.append(f"entity:{entity}")
             continue
+        entity_notes = annotations.get(entity, {})
         for field in fields:
             field_data = entity_data["fields"].get(field)
             if not field_data:
@@ -461,6 +464,7 @@ def resolve_field_refs(mapping, backend):
                     "entity": entity,
                     "href": link_for_source(field_data["source_file"], field_data["line"]),
                     "easy_note": EASY_FIELD_EXPLANATIONS.get(field, field_data["note"]),
+                    "team_note": entity_notes.get(field, ""),
                 }
             )
     return refs, missing
@@ -520,8 +524,8 @@ def contract_from_llm_spec(llm_spec, key):
     }
 
 
-def resolve_step(mapping, backend, llm_spec, source_sections):
-    field_refs, missing_fields = resolve_field_refs(mapping, backend)
+def resolve_step(mapping, backend, llm_spec, source_sections, annotations=None):
+    field_refs, missing_fields = resolve_field_refs(mapping, backend, annotations)
     api_refs, missing_apis = resolve_api_refs(mapping, backend)
     source_refs = source_refs_for(source_sections, mapping["source_needles"])
     source_missing = [needle for needle in mapping["source_needles"] if not any(needle in ref["title"] for ref in source_refs)]
@@ -697,7 +701,12 @@ def build_index():
     source_sections = extract_front_sections(LLM_GUIDE_PATH)
     backend = load_backend_data()
     llm_spec = load_llm_spec()
-    steps = [resolve_step(item, backend, llm_spec, source_sections) for item in PIPELINE_MAP]
+    annotations = {}
+    if CANONICAL_PATH.exists():
+        with CANONICAL_PATH.open(encoding="utf-8") as f:
+            canonical = json.load(f)
+        annotations = canonical.get("collaborator_annotations", {}).get("entities", {})
+    steps = [resolve_step(item, backend, llm_spec, source_sections, annotations) for item in PIPELINE_MAP]
     all_fields, all_apis = flatten_backend(backend)
     dictionary = llm_spec.get("standard_tags", {})
     dictionary_terms = sum(len(values) for values in dictionary.values())
@@ -1177,6 +1186,7 @@ HTML_TEMPLATE = """<!doctype html>
           <td><code>${escapeHtml(ref.entity)}.${escapeHtml(ref.name)}</code></td>
           <td>${escapeHtml(ref.easy_note)}</td>
           <td>${escapeHtml(ref.note)}</td>
+          <td class="team-note">${escapeHtml(ref.team_note || "")}</td>
           <td>${sourceLink(ref)}</td>
         </tr>
       `).join("");
@@ -1217,7 +1227,7 @@ HTML_TEMPLATE = """<!doctype html>
             <table><tbody>${fileRows || "<tr><td>연결된 파일 없음</td></tr>"}</tbody></table>
           </div>
           ${missing}
-          <div class="panel full"><h3>관련 백엔드 필드</h3><table><thead><tr><th>필드</th><th>쉽게 말하면</th><th>원문 메모</th><th>출처</th></tr></thead><tbody>${fieldRows || "<tr><td colspan='4'>관련 필드 없음</td></tr>"}</tbody></table></div>
+          <div class="panel full"><h3>관련 백엔드 필드</h3><table><thead><tr><th>필드</th><th>쉽게 말하면</th><th>원문 메모</th><th>팀 메모</th><th>출처</th></tr></thead><tbody>${fieldRows || "<tr><td colspan='5'>관련 필드 없음</td></tr>"}</tbody></table></div>
           <div class="panel full"><h3>관련 백엔드 API</h3><table><thead><tr><th>엔드포인트</th><th>쉽게 말하면</th><th>원문 용도</th><th>요청값</th><th>출처</th></tr></thead><tbody>${apiRows || "<tr><td colspan='5'>관련 API 없음</td></tr>"}</tbody></table></div>
           <div class="panel full"><h3>에러 코드</h3><table><thead><tr><th>코드</th><th>의미</th><th>사장님 안내</th></tr></thead><tbody>${renderErrors()}</tbody></table></div>
           <div class="panel full"><h3>표준 태그 사전</h3><table><thead><tr><th>분류</th><th>허용값</th></tr></thead><tbody>${renderDictionary()}</tbody></table></div>
