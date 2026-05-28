@@ -77,3 +77,19 @@ jobs:
 
       - name: Test e2e
         run: pytest tests/e2e -m e2e -v
+
+      # 백엔드 코드 파생 계약 산출물이 코드와 어긋나면 실패 (스펙 인덱스는 validate.yml이 담당)
+      - name: Regenerate contract artifacts
+        working-directory: ${{ github.workspace }}
+        run: |
+          python tools/export_openapi.py
+          python tools/build_contract_reference.py
+          python tools/build_ai_onboarding_bundles.py
+
+      - name: Fail on contract drift
+        working-directory: ${{ github.workspace }}
+        run: |
+          if ! git diff --exit-status -- docs/; then
+            echo "::error::docs/ 계약 산출물이 backend 코드와 어긋납니다. tools/ 생성기를 재실행 후 커밋하세요."
+            exit 1
+          fi

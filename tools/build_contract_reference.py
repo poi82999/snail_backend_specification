@@ -196,7 +196,6 @@ def _render_enum_rows(enums: dict[str, list[str]]) -> str:
 
 
 def _render_html(entries: list[ErrorEntry], enums: dict[str, list[str]]) -> str:
-    generated_at = datetime.now(UTC).isoformat()
     return f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -313,7 +312,7 @@ def _render_html(entries: list[ErrorEntry], enums: dict[str, list[str]]) -> str:
 <body>
   <header>
     <h1>Snail API 계약 레퍼런스</h1>
-    <div class="meta">생성 시각: {_escape(generated_at)} · 코드에서 자동 추출 · 에러는 <code>AppError(...)</code>, enum은 <code>app/models/enums.py</code> 기준</div>
+    <div class="meta">코드에서 자동 추출 · 에러는 <code>AppError(...)</code>, enum은 <code>app/models/enums.py</code> 기준</div>
   </header>
   <main>
     <section class="section">

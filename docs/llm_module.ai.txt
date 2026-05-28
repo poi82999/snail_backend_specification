@@ -1,6 +1,6 @@
 # llm_module.ai.txt — Snail LLM 모듈 AI 번들
 
-Generated at: 2026-05-28T09:59:16.139511+00:00
+Generated at: 백엔드 코드에서 자동 생성 (수동 편집 금지)
 Source: backend/app/workers/llm_pipeline.py + backend/app/services/llm + docs/openapi.json
 
 목표: Transform/Classify/Embed 작업자가 백엔드 저장 필드, 상태 전이, GCS 인터페이스, 표준 태그 사전을 한 파일에서 이해하게 한다.

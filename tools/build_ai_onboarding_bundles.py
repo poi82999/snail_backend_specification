@@ -4,7 +4,6 @@ import json
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
@@ -741,7 +740,7 @@ AI 도구(Cursor, Claude, Codex 등)에 파일/URL 하나만 줄 수 있으면 �
 def main() -> None:
     schema = _load_openapi()
     operations = _iter_operations(schema)
-    generated_at = datetime.now(UTC).isoformat()
+    generated_at = "백엔드 코드에서 자동 생성 (수동 편집 금지)"
 
     outputs = {
         "llms.txt": _llms_txt(generated_at),

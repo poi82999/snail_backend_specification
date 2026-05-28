@@ -1,6 +1,6 @@
 # api_cookbook.ai.txt — 작업지향 레시피
 
-Generated at: 2026-05-28T09:59:16.139511+00:00
+Generated at: 백엔드 코드에서 자동 생성 (수동 편집 금지)
 
 이 파일은 비개발자와 AI에게 "무엇을 어떤 순서로 호출해야 하는지"를 복붙 가능한 흐름으로 준다. 상세 스키마는 `docs/openapi.json`, 에러/enum 전체 계약은 `docs/api_contract_reference.html`도 함께 본다.
 
