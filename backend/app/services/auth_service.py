@@ -180,6 +180,63 @@ async def apple_sign_in(
     return user, _issue_token_pair(ActorType.USER, user.id)
 
 
+async def google_sign_in(
+    session: AsyncSession,
+    id_token: str,
+    nickname_hint: str | None,
+    accepted_terms_version: str,
+    accepted_privacy_version: str,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> tuple[User, TokenPair]:
+    identity = await security.verify_google_id_token(id_token)
+    oauth_identity = await session.scalar(
+        select(UserOAuthIdentity).where(
+            UserOAuthIdentity.provider == "google",
+            UserOAuthIdentity.provider_sub == identity.sub,
+        )
+    )
+
+    if oauth_identity is not None:
+        user = await session.get(User, oauth_identity.user_id)
+        if user is None or not user.is_active:
+            raise AppError("USER_DISABLED", "사용할 수 없는 계정입니다.", HTTPStatus.FORBIDDEN)
+        return user, _issue_token_pair(ActorType.USER, user.id)
+
+    hint = nickname_hint or identity.name
+    nickname = await _build_unique_nickname(session, hint)
+    user = User(
+        id=uuid4(),
+        email=identity.email,
+        nickname=nickname,
+    )
+    session.add(user)
+    await session.flush()
+
+    session.add(
+        UserOAuthIdentity(
+            id=uuid4(),
+            user_id=user.id,
+            provider="google",
+            provider_sub=identity.sub,
+            email=identity.email,
+            raw_payload=cast(dict[str, object], identity.model_dump(mode="json")),
+        )
+    )
+    await _record_terms_acceptances(
+        session,
+        ActorType.USER,
+        user.id,
+        accepted_terms_version,
+        accepted_privacy_version,
+        ip_address,
+        user_agent,
+    )
+    await session.flush()
+    await session.refresh(user)
+    return user, _issue_token_pair(ActorType.USER, user.id)
+
+
 async def owner_signup(
     session: AsyncSession,
     req: OwnerSignupRequest,

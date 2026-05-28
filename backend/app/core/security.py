@@ -184,3 +184,113 @@ async def verify_apple_id_token(id_token: str) -> AppleIdentity:
             "Apple 인증에 실패했습니다.",
             HTTPStatus.UNAUTHORIZED,
         ) from exc
+
+
+# ── Google Sign In ──────────────────────────────────────────────
+
+GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs"
+GOOGLE_JWKS_CACHE_SECONDS = 60 * 60
+
+_google_jwks_cache: dict[str, object] = {}
+_google_jwks_lock = asyncio.Lock()
+
+
+class GoogleIdentity(BaseModel):
+    sub: str
+    email: str | None = None
+    email_verified: bool = False
+    name: str | None = None
+    picture: str | None = None
+
+
+async def _get_google_jwks() -> dict[str, Any]:
+    now = datetime.now(UTC)
+    cached_keys = _google_jwks_cache.get("keys")
+    cached_expires_at = _google_jwks_cache.get("expires_at")
+    if isinstance(cached_keys, dict) and isinstance(cached_expires_at, datetime):
+        if cached_expires_at > now:
+            return cached_keys
+
+    async with _google_jwks_lock:
+        cached_keys = _google_jwks_cache.get("keys")
+        cached_expires_at = _google_jwks_cache.get("expires_at")
+        if isinstance(cached_keys, dict) and isinstance(cached_expires_at, datetime):
+            if cached_expires_at > now:
+                return cached_keys
+
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(GOOGLE_JWKS_URL)
+                response.raise_for_status()
+                jwks = response.json()
+        except Exception as exc:
+            raise AppError(
+                "GOOGLE_VERIFY_FAILED",
+                "Google 인증에 실패했습니다.",
+                HTTPStatus.UNAUTHORIZED,
+            ) from exc
+
+        if not isinstance(jwks, dict) or not isinstance(jwks.get("keys"), list):
+            raise AppError(
+                "GOOGLE_VERIFY_FAILED",
+                "Google 인증에 실패했습니다.",
+                HTTPStatus.UNAUTHORIZED,
+            )
+
+        _google_jwks_cache["keys"] = jwks
+        _google_jwks_cache["expires_at"] = now + timedelta(seconds=GOOGLE_JWKS_CACHE_SECONDS)
+        return jwks
+
+
+async def verify_google_id_token(id_token: str) -> GoogleIdentity:
+    settings = get_settings()
+    allowed_audiences = [settings.GOOGLE_CLIENT_ID, *settings.GOOGLE_CLIENT_IDS]
+    allowed_audiences = [a for a in allowed_audiences if a]
+    if not allowed_audiences:
+        raise AppError(
+            "GOOGLE_VERIFY_FAILED",
+            "Google Client ID가 설정되지 않았습니다.",
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+        )
+
+    try:
+        header = jwt.get_unverified_header(id_token)
+        kid = header.get("kid")
+        if not isinstance(kid, str):
+            raise ValueError("Google token header must contain kid")
+
+        jwks = await _get_google_jwks()
+        keys = jwks.get("keys")
+        if not isinstance(keys, list):
+            raise ValueError("Google JWKS keys must be a list")
+
+        jwk = next((key for key in keys if isinstance(key, dict) and key.get("kid") == kid), None)
+        if jwk is None:
+            raise ValueError("Google signing key not found")
+
+        signing_key = jwt.PyJWK.from_dict(jwk).key
+        payload = jwt.decode(
+            id_token,
+            signing_key,
+            algorithms=["RS256"],
+            audience=allowed_audiences,
+            issuer=["https://accounts.google.com", "accounts.google.com"],
+        )
+        if not isinstance(payload, dict):
+            raise ValueError("Google token payload must be an object")
+
+        return GoogleIdentity(
+            sub=str(payload["sub"]),
+            email=cast(str | None, payload.get("email")),
+            email_verified=_bool_claim(payload.get("email_verified")),
+            name=cast(str | None, payload.get("name")),
+            picture=cast(str | None, payload.get("picture")),
+        )
+    except AppError:
+        raise
+    except Exception as exc:
+        raise AppError(
+            "GOOGLE_VERIFY_FAILED",
+            "Google 인증에 실패했습니다.",
+            HTTPStatus.UNAUTHORIZED,
+        ) from exc

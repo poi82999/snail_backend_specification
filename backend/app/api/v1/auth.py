@@ -16,6 +16,8 @@ from app.models.enums import ActorType
 from app.schemas.auth import (
     AppleSignInRequest,
     AppleSignInResponse,
+    GoogleSignInRequest,
+    GoogleSignInResponse,
     OwnerLoginRequest,
     OwnerSignupRequest,
     PasswordResetConfirmRequest,
@@ -66,6 +68,39 @@ async def apple_sign_in(
             request.headers.get("User-Agent"),
         )
         response = AppleSignInResponse(tokens=tokens, user=UserMe.model_validate(user))
+        idem.set_response(HTTPStatus.OK, response_body(response))
+    await session.commit()
+    return response
+
+
+@router.post(
+    "/google",
+    response_model=GoogleSignInResponse,
+    summary="구글 로그인",
+)
+async def google_sign_in(
+    request: Request,
+    payload: GoogleSignInRequest,
+    idempotency_key: IdempotencyKeyDep,
+    session: SessionDep,
+) -> GoogleSignInResponse | Response:
+    request_hash = await request_hash_for(request)
+    response: GoogleSignInResponse
+    async with with_idempotency(
+        session, ActorType.SYSTEM, SYSTEM_ACTOR_ID, idempotency_key, request_hash
+    ) as idem:
+        if idem.cached:
+            return cached_response(idem)
+        user, tokens = await auth_service.google_sign_in(
+            session,
+            payload.id_token,
+            None,
+            payload.accepted_terms_version,
+            payload.accepted_privacy_version,
+            _client_host(request),
+            request.headers.get("User-Agent"),
+        )
+        response = GoogleSignInResponse(tokens=tokens, user=UserMe.model_validate(user))
         idem.set_response(HTTPStatus.OK, response_body(response))
     await session.commit()
     return response

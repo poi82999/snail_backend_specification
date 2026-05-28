@@ -20,6 +20,24 @@ config.set_main_option("sqlalchemy.url", str(settings.DATABASE_URL))
 target_metadata = Base.metadata
 
 
+# Patch op.execute to split multiple statements, to fix asyncpg error
+from alembic.operations import Operations
+
+original_execute = Operations.execute
+
+
+def patched_execute(self, sql, execution_options=None):
+    if isinstance(sql, str):
+        for stmt in sql.split(";"):
+            if stmt.strip():
+                original_execute(self, stmt.strip(), execution_options)
+    else:
+        original_execute(self, sql, execution_options)
+
+
+Operations.execute = patched_execute
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=str(settings.DATABASE_URL),

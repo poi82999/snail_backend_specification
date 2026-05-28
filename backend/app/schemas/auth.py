@@ -26,6 +26,18 @@ class AppleSignInResponse(BaseModel):
     user: UserMe
 
 
+class GoogleSignInRequest(BaseModel):
+    id_token: str
+    accepted_terms_version: str = Field(min_length=1, max_length=20)
+    accepted_privacy_version: str = Field(min_length=1, max_length=20)
+    nonce: str | None = None
+
+
+class GoogleSignInResponse(BaseModel):
+    tokens: TokenPair
+    user: UserMe
+
+
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 

@@ -10,7 +10,7 @@ from uuid import uuid4
 import pytest
 from app.api import deps
 from app.core.config import Settings, get_settings
-from app.core.security import AppleIdentity, hash_password, issue_access_token
+from app.core.security import AppleIdentity, GoogleIdentity, hash_password, issue_access_token
 from app.main import create_app
 from app.models.accounts import Owner, User
 from app.models.base import Base
@@ -140,6 +140,25 @@ def mock_apple_signin(monkeypatch: pytest.MonkeyPatch) -> AppleIdentity:
         return identity
 
     monkeypatch.setattr(security, "verify_apple_id_token", fake_verify_apple_id_token)
+    return identity
+
+
+@pytest.fixture
+def mock_google_signin(monkeypatch: pytest.MonkeyPatch) -> GoogleIdentity:
+    from app.core import security
+
+    identity = GoogleIdentity(
+        sub="google-test-sub",
+        email="google@example.com",
+        email_verified=True,
+        name="테스트유저",
+        picture="https://example.com/photo.jpg",
+    )
+
+    async def fake_verify_google_id_token(_: str) -> GoogleIdentity:
+        return identity
+
+    monkeypatch.setattr(security, "verify_google_id_token", fake_verify_google_id_token)
     return identity
 
 

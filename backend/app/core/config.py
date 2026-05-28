@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     APPLE_KEY_ID: str = ""
     APPLE_PRIVATE_KEY_PATH: str = ""
 
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_IDS: list[str] = Field(default_factory=list)
+
     APNS_TEAM_ID: str = ""
     APNS_KEY_ID: str = ""
     APNS_PRIVATE_KEY_PATH: str = ""
