@@ -89,7 +89,10 @@ jobs:
       - name: Fail on contract drift
         working-directory: ${{ github.workspace }}
         run: |
-          if ! git diff --exit-status -- docs/; then
+          CHANGED="$(git status --porcelain -- docs/)"
+          if [ -n "$CHANGED" ]; then
+            echo "$CHANGED"
+            git --no-pager diff -- docs/ | head -200
             echo "::error::docs/ 계약 산출물이 backend 코드와 어긋납니다. tools/ 생성기를 재실행 후 커밋하세요."
             exit 1
           fi
