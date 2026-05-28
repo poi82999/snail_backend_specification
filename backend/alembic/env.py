@@ -30,9 +30,9 @@ def patched_execute(self, sql, execution_options=None):
     if isinstance(sql, str):
         for stmt in sql.split(";"):
             if stmt.strip():
-                original_execute(self, stmt.strip(), execution_options)
+                original_execute(self, stmt.strip(), execution_options=execution_options)
     else:
-        original_execute(self, sql, execution_options)
+        original_execute(self, sql, execution_options=execution_options)
 
 
 Operations.execute = patched_execute

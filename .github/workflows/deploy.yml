@@ -1,8 +1,7 @@
 name: Deploy (prod)
 
+# 시크릿(GCP/Cloud SQL 등) 구성 전까지 push 자동 배포 비활성화. 출시 준비되면 수동 실행 또는 push 트리거 복구.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
