@@ -13,9 +13,11 @@ from app.core.config import Settings, get_settings
 from app.core.security import AppleIdentity, hash_password, issue_access_token
 from app.main import create_app
 from app.models.accounts import Owner, User
+from app.models.base import Base
 from app.models.enums import ActorType, UploadTargetType
 from httpx import ASGITransport, AsyncClient
 from redis.asyncio import Redis, from_url
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 
@@ -62,6 +64,11 @@ async def db_session(settings_override: Settings) -> AsyncIterator[AsyncSession]
     engine = create_async_engine(str(settings_override.DATABASE_URL), pool_pre_ping=True)
     connection = await engine.connect()
     transaction = await connection.begin()
+    # 데모용 seed(commit된 데이터)와 테스트를 격리한다. 외부 트랜잭션 안에서 전 테이블을
+    # 비워 테스트는 깨끗한 DB에서 시작하고, 끝에서 transaction.rollback()으로 TRUNCATE까지
+    # 되돌려 seed 데이터를 원상 복구한다.
+    table_names = ", ".join(f'"{name}"' for name in Base.metadata.tables)
+    await connection.execute(text(f"TRUNCATE TABLE {table_names} RESTART IDENTITY CASCADE"))
     session_factory = async_sessionmaker(connection, expire_on_commit=False, autoflush=False)
     session = session_factory()
     await session.begin_nested()

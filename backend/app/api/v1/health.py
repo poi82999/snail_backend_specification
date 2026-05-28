@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from app.core.database import _sessionmaker
+from app.core import database
 from app.core.redis import get_redis
 
 router = APIRouter()
@@ -19,9 +19,10 @@ async def health() -> HealthResponse:
     db_status = "down"
     redis_status = "down"
 
-    if _sessionmaker is not None:
+    sessionmaker = database._sessionmaker
+    if sessionmaker is not None:
         try:
-            async with _sessionmaker() as session:
+            async with sessionmaker() as session:
                 await session.execute(text("SELECT 1"))
             db_status = "up"
         except Exception:

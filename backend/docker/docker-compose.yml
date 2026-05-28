@@ -51,6 +51,25 @@ services:
       sh -c "alembic upgrade head &&
              gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 2 -b 0.0.0.0:8000 --timeout 60"
 
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: snail-worker
+    environment:
+      ENV: local
+      JWT_SECRET: dev-only-change-me-32-chars-minimum
+      DATABASE_URL: postgresql+asyncpg://snail:snail@postgres:5432/snail
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    command: ["arq", "app.workers.main.WorkerSettings"]
+
 volumes:
   postgres-data:
   redis-data:

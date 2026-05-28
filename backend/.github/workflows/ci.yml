@@ -64,6 +64,9 @@ jobs:
       - name: Lint
         run: ruff check app tests alembic
 
+      - name: Type check
+        run: mypy app
+
       - name: Migrate
         run: alembic upgrade head
 
