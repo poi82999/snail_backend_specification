@@ -1,6 +1,6 @@
 # Snail Backend AI Entry Point
 
-Generated at: 2026-05-28T06:51:47.022968+00:00
+Generated at: 2026-05-28T09:59:16.139511+00:00
 
 AI 도구(Cursor, Claude, Codex 등)에 파일/URL 하나만 줄 수 있으면 이 파일을 먼저 준다.
 

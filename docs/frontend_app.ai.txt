@@ -1,6 +1,6 @@
 # frontend_app.ai.txt — Snail 유저 앱 AI 번들
 
-Generated at: 2026-05-28T06:51:47.022968+00:00
+Generated at: 2026-05-28T09:59:16.139511+00:00
 Source: docs/openapi.json + backend/app AppError/StrEnum scan
 
 목표: iOS 유저 앱 또는 모바일 프론트 AI가 이 파일 하나로 인증, 탐색, 예약, 커뮤니티 호출 코드를 만들 수 있게 한다.
@@ -31,11 +31,11 @@ Source: docs/openapi.json + backend/app AppError/StrEnum scan
 - ACCOUNT_LOCKED | 423 LOCKED | 잠시 후 다시 시도해주세요.
 - APPLE_VERIFY_FAILED | 401 UNAUTHORIZED | Apple 인증에 실패했습니다.
 - BUSINESS_VERIFICATION_NOT_FOUND | 404 NOT_FOUND | 사업자 인증 제출 내역이 없습니다.
-- CANCEL_REASON_REQUIRED | 422 UNPROCESSABLE_CONTENT | 취소 사유가 필요합니다.
+- CANCEL_REASON_REQUIRED | 422 UNPROCESSABLE_ENTITY | 취소 사유가 필요합니다.
 - CANNOT_FOLLOW_SELF | 400 BAD_REQUEST | 자신을 팔로우할 수 없습니다.
 - COMMENT_DEPTH_EXCEEDED | 400 BAD_REQUEST | 대댓글은 2단계까지만 작성할 수 있습니다.
 - COMMENT_NOT_FOUND | 404 NOT_FOUND | 댓글을 찾을 수 없습니다.
-- DESIGNER_NOT_AVAILABLE | 422 UNPROCESSABLE_CONTENT | 해당 디자인을 담당할 수 있는 디자이너가 아닙니다.
+- DESIGNER_NOT_AVAILABLE | 422 UNPROCESSABLE_ENTITY | 해당 디자인을 담당할 수 있는 디자이너가 아닙니다.
 - DESIGNER_NOT_FOUND | 404 NOT_FOUND | 디자이너를 찾을 수 없습니다.
 - DESIGN_IMAGE_NOT_FOUND | 404 NOT_FOUND | 디자인 이미지를 찾을 수 없습니다.
 - DESIGN_NOT_FOUND | 404 NOT_FOUND | 디자인을 찾을 수 없습니다.
@@ -46,21 +46,22 @@ Source: docs/openapi.json + backend/app AppError/StrEnum scan
 - EMAIL_TAKEN | 409 CONFLICT | 이미 가입된 이메일입니다.
 - FORBIDDEN | 403 FORBIDDEN | 권한이 없습니다.
 - GCS_BUCKET_NOT_CONFIGURED | 500 INTERNAL_SERVER_ERROR | 스토리지 설정이 없습니다.
+- GOOGLE_VERIFY_FAILED | 401 UNAUTHORIZED, 500 INTERNAL_SERVER_ERROR | Google 인증에 실패했습니다.
 - IDEMPOTENCY_KEY_REQUIRED | 400 BAD_REQUEST | Idempotency-Key 헤더가 필요합니다.
 - IDEMPOTENCY_MISMATCH | 409 CONFLICT | 동일한 멱등키로 다른 요청을 처리할 수 없습니다.
 - INVALID_BBOX | 400 BAD_REQUEST | bbox는 'minLng,minLat,maxLng,maxLat' 형식이어야 합니다.
 - INVALID_BUSINESS_HOURS | 400 BAD_REQUEST | 영업일에는 시작 시간과 종료 시간이 필요합니다.
 - INVALID_CREDENTIALS | 401 UNAUTHORIZED | 이메일 또는 비밀번호를 확인해주세요.
 - INVALID_CURSOR | 400 BAD_REQUEST | 페이지 커서가 올바르지 않습니다.
-- INVALID_DATE_RANGE | 422 UNPROCESSABLE_CONTENT | 조회 시작일은 종료일보다 늦을 수 없습니다.
+- INVALID_DATE_RANGE | 422 UNPROCESSABLE_ENTITY | 조회 시작일은 종료일보다 늦을 수 없습니다.
 - INVALID_DESIGNER | 400 BAD_REQUEST | 본인 샵의 활성 디자이너만 지정할 수 있습니다.
 - INVALID_DESIGNER_SCHEDULE | 400 BAD_REQUEST | 디자이너 스케줄은 요일별 7건이 필요합니다.
-- INVALID_DESIGN_OPTION | 422 UNPROCESSABLE_CONTENT | 선택한 옵션이 유효하지 않습니다.
+- INVALID_DESIGN_OPTION | 422 UNPROCESSABLE_ENTITY | 선택한 옵션이 유효하지 않습니다.
 - INVALID_IMAGE | 400 BAD_REQUEST | 이미지를 처리할 수 없습니다.
 - INVALID_IMAGE_SIZE | 400 BAD_REQUEST | 이미지 크기 제한이 올바르지 않습니다.
 - INVALID_LOCATION_TAG | 400 BAD_REQUEST | (메시지 동적 생성; 발생 위치 기준 확인)
 - INVALID_PASSWORD_POLICY | 400 BAD_REQUEST | 비밀번호는 8자 이상이며 대소문자와 숫자를 포함해야 합니다.
-- INVALID_PAYMENT_POLICY | 400 BAD_REQUEST, 409 CONFLICT, 422 UNPROCESSABLE_CONTENT | 자동 수락은 현장 결제(on_site)에서만 가능합니다.
+- INVALID_PAYMENT_POLICY | 400 BAD_REQUEST, 409 CONFLICT, 422 UNPROCESSABLE_ENTITY | 자동 수락은 현장 결제(on_site)에서만 가능합니다.
 - INVALID_REFRESH_TOKEN | 401 UNAUTHORIZED | 다시 로그인해주세요.
 - INVALID_RESET_TOKEN | 400 BAD_REQUEST | 비밀번호 재설정 링크가 올바르지 않습니다.
 - INVALID_TIME_OFF | 400 BAD_REQUEST | 부분 휴무는 시작 시간과 종료 시간을 함께 입력해야 합니다.
@@ -80,7 +81,7 @@ Source: docs/openapi.json + backend/app AppError/StrEnum scan
 - OPENAI_REQUEST_REJECTED | 502 BAD_GATEWAY | OpenAI 요청이 거부되었습니다.
 - OWNER_NOT_APPROVED | 403 FORBIDDEN | 사업자 인증 후 샵을 등록할 수 있습니다.
 - OWNER_NOT_FOUND | 404 NOT_FOUND | 사장님 계정을 찾을 수 없습니다.
-- REJECT_REASON_REQUIRED | 422 UNPROCESSABLE_CONTENT | 거절 사유가 필요합니다.
+- REJECT_REASON_REQUIRED | 422 UNPROCESSABLE_ENTITY | 거절 사유가 필요합니다.
 - REPORT_TARGET_NOT_FOUND | 404 NOT_FOUND | 신고 대상을 찾을 수 없습니다.
 - RESERVATION_LIMIT_EXCEEDED | 409 CONFLICT | 동시에 보유할 수 있는 활성 예약 수를 초과했습니다.
 - RESERVATION_NOT_COMPLETED | 400 BAD_REQUEST | 완료된 예약만 리뷰 작성 가능합니다.
@@ -92,7 +93,7 @@ Source: docs/openapi.json + backend/app AppError/StrEnum scan
 - SHOP_ALREADY_EXISTS | 409 CONFLICT | 이미 등록된 샵이 있습니다.
 - SHOP_IMAGE_NOT_FOUND | 404 NOT_FOUND | 샵 이미지를 찾을 수 없습니다.
 - SHOP_NOT_FOUND | 404 NOT_FOUND | 샵을 찾을 수 없습니다.
-- SLOT_IN_PAST | 422 UNPROCESSABLE_CONTENT | 이미 지난 시간은 예약할 수 없습니다.
+- SLOT_IN_PAST | 422 UNPROCESSABLE_ENTITY | 이미 지난 시간은 예약할 수 없습니다.
 - SLOT_TAKEN | 409 CONFLICT | 이미 예약된 시간입니다.
 - SNAP_NOT_FOUND | 404 NOT_FOUND | 스네일을 찾을 수 없습니다.
 - TIME_OFF_NOT_FOUND | 404 NOT_FOUND | 휴무 일정을 찾을 수 없습니다.
